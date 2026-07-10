@@ -1,0 +1,61 @@
+{
+  "name": "openspec-dashboard",
+  "version": "0.0.0",
+  "description": "A read-only dashboard for browsing OpenSpec changes, archives and specs.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "openspec-dashboard": "bin/openspec-dashboard.js"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "packageManager": "pnpm@11.1.1",
+  "scripts": {
+    "lint": "biome ci .",
+    "format": "biome check --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build:client": "vite build",
+    "build:server": "tsc -p tsconfig.build.json",
+    "build": "pnpm clean && pnpm build:client && pnpm build:server",
+    "start": "node bin/openspec-dashboard.js",
+    "dev": "pnpm run --parallel \"/^dev:/\"",
+    "dev:client": "vite",
+    "dev:server": "pnpm build:server && node --watch dist/server/main.js --no-open --port 4321"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.8",
+    "@tanstack/react-query": "^5.101.2",
+    "cross-spawn": "^7.0.6",
+    "hono": "^4.12.28",
+    "open": "^11.0.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router": "^8.2.0",
+    "semver": "^7.8.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.3",
+    "@fission-ai/openspec": "^1.5.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/cross-spawn": "^6.0.6",
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@types/semver": "^7.7.1",
+    "@vitejs/plugin-react": "^6.0.3",
+    "jsdom": "^29.1.1",
+    "typescript": "^7",
+    "vite": "^8.1.4",
+    "vitest": "^4.1.10"
+  }
+}

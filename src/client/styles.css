@@ -1,0 +1,63 @@
+/* Structural layout only. Design tokens arrive with the markdown-viewer change. */
+
+:root {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+}
+
+.app__header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid #d4d4d8;
+}
+
+.app__brand {
+  font-weight: 600;
+}
+
+.navigation {
+  display: flex;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.nav-link--active {
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.refresh-control {
+  margin-left: auto;
+}
+
+.app__main {
+  padding: 1.5rem;
+}
+
+.diagnostics__details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0;
+}
+
+.diagnostics__details dt {
+  font-weight: 600;
+}
+
+.diagnostics__details dd {
+  margin: 0;
+}

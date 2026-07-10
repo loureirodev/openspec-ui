@@ -1,0 +1,4 @@
+allowBuilds:
+  # The openspec binary is only ever spawned as a subprocess by the tests, and runs
+  # without its postinstall script.
+  '@fission-ai/openspec': false
