@@ -99,6 +99,17 @@ describe("resolveArtifactsFromBinary", () => {
     expect(artifacts[0]?.id).toBe("rfc");
     expect(artifacts[0]?.status).toBe("done");
   });
+
+  it("resolves to no artifacts when the status body omits `artifacts`, without throwing", async () => {
+    const deps: AdapterDeps = {
+      run: runFor({ status: { stdout: JSON.stringify({ changeName: "demo" }) } }),
+      readScoped: readerFor({}),
+      projectRoot: PROJECT_ROOT,
+      openspecRoot: OPENSPEC_ROOT,
+    };
+
+    await expect(resolveArtifactsFromBinary(deps, "demo")).resolves.toEqual([]);
+  });
 });
 
 describe("resolveArtifactsFromFilesystem", () => {

@@ -14,7 +14,7 @@ import {
   type SpecSummary,
 } from "./openspec-data.js";
 import { createScopedReader } from "./safe-file.js";
-import { type ResolvedSchema, resolveSchemaName } from "./schema.js";
+import { type ResolvedSchema, readProjectDefaultSchema, resolveSchemaName } from "./schema.js";
 import { aggregateProgress, type Progress } from "./task-progress.js";
 
 /**
@@ -67,6 +67,17 @@ export interface ChangeListItem {
   lastModified?: string;
   schema?: ResolvedSchema;
   /** Present only when this change failed to resolve; its other fields are then best-effort. */
+  error?: StructuredError;
+}
+
+/**
+ * The result of {@link listChanges}: the resolved changes and, when the binary's active-change
+ * list could not be fetched, a top-level `error`. Archived changes come from the filesystem and
+ * are listed regardless, so a broken or missing binary yields a *partial* list rather than none.
+ */
+export interface ChangeListResult {
+  changes: ChangeListItem[];
+  /** Present only when the active-change list failed; `changes` then holds archived changes only. */
   error?: StructuredError;
 }
 
@@ -127,7 +138,7 @@ async function readTaskMarkdown(deps: AdapterDeps, changeDir: string): Promise<s
   const paths: string[] = [];
 
   const directFile = join(changeDir, `${TASKS_ARTIFACT_ID}.md`);
-  if ((await pathKind(directFile)) !== null) paths.push(directFile);
+  if ((await pathKind(directFile)) === "file") paths.push(directFile);
 
   const directory = join(changeDir, TASKS_ARTIFACT_ID);
   if ((await pathKind(directory)) === "dir") paths.push(...(await collectMarkdown(directory)));
@@ -145,12 +156,14 @@ async function computeChangeProgress(deps: AdapterDeps, changeDir: string): Prom
 async function resolveActiveItem(
   deps: AdapterDeps,
   summary: ChangeSummary,
+  projectDefault: string,
 ): Promise<ChangeListItem> {
   const changeDir = join(deps.openspecRoot, "changes", summary.name);
   const schema = await resolveSchemaName({
     readScoped: deps.readScoped,
     openspecRoot: deps.openspecRoot,
     changeDir,
+    projectDefault,
   });
   return {
     name: summary.name,
@@ -164,11 +177,16 @@ async function resolveActiveItem(
 }
 
 /** Resolves one archived change into a list item, recomputing progress the binary cannot supply. */
-async function resolveArchivedItem(deps: AdapterDeps, ref: ChangeRef): Promise<ChangeListItem> {
+async function resolveArchivedItem(
+  deps: AdapterDeps,
+  ref: ChangeRef,
+  projectDefault: string,
+): Promise<ChangeListItem> {
   const schema = await resolveSchemaName({
     readScoped: deps.readScoped,
     openspecRoot: deps.openspecRoot,
     changeDir: ref.changeDir,
+    projectDefault,
   });
   const progress = await computeChangeProgress(deps, ref.changeDir);
   return {
@@ -195,25 +213,36 @@ async function isolate(
 
 /**
  * Lists every change — active and archived — as a resolved item or, on per-change failure, an
- * item carrying a structured `error`. One corrupt change never aborts the list, so a consumer
- * can serve the whole list with HTTP 200 and render the failure inline.
+ * item carrying a structured `error`. Isolation is two-layered: one corrupt change never aborts
+ * the list, and a failure of the binary's active-change list never hides the filesystem-only
+ * archived changes — it surfaces as the result's top-level `error` while the archived changes
+ * still resolve. Either way a consumer can serve HTTP 200 and render every failure inline.
  */
-export async function listChanges(options: AdapterOptions = {}): Promise<ChangeListItem[]> {
+export async function listChanges(options: AdapterOptions = {}): Promise<ChangeListResult> {
   const deps = resolveDeps(options);
 
-  const [activeSummaries, archivedRefs] = await Promise.all([
-    runListChanges(deps.run).then((list) => list.changes),
+  const [activeList, archivedRefs, projectDefault] = await Promise.all([
+    // Isolate the binary list call so its failure degrades to a partial list, not a thrown one.
+    runListChanges(deps.run).then(
+      (list) => ({ summaries: list.changes, error: undefined as StructuredError | undefined }),
+      (error): { summaries: ChangeSummary[]; error?: StructuredError } => ({
+        summaries: [],
+        error: toStructuredError(error),
+      }),
+    ),
     discoverArchivedRefs(deps),
+    // Read the project default schema once here, not once per change inside each resolver.
+    readProjectDefaultSchema(deps.readScoped, deps.openspecRoot),
   ]);
 
-  const active = activeSummaries.map((summary) =>
-    isolate(summary.name, false, () => resolveActiveItem(deps, summary)),
+  const active = activeList.summaries.map((summary) =>
+    isolate(summary.name, false, () => resolveActiveItem(deps, summary, projectDefault)),
   );
   const archived = archivedRefs.map((ref) =>
-    isolate(ref.name, true, () => resolveArchivedItem(deps, ref)),
+    isolate(ref.name, true, () => resolveArchivedItem(deps, ref, projectDefault)),
   );
 
-  return Promise.all([...active, ...archived]);
+  return { changes: await Promise.all([...active, ...archived]), error: activeList.error };
 }
 
 /**

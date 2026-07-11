@@ -33,6 +33,14 @@ describe("parseSchemaField", () => {
     expect(parseSchemaField('schema: "custom"')).toBe("custom");
   });
 
+  it("drops a trailing inline comment from an unquoted value", () => {
+    expect(parseSchemaField("schema: custom  # my schema")).toBe("custom");
+  });
+
+  it("keeps a `#` that lives inside a quoted value", () => {
+    expect(parseSchemaField('schema: "a # b"')).toBe("a # b");
+  });
+
   it("returns null when no schema key is present", () => {
     expect(parseSchemaField("created: 2026-07-10")).toBeNull();
   });

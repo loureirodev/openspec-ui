@@ -1,5 +1,5 @@
-import { join, relative } from "node:path";
-import { collectMarkdown, pathKind } from "./fs-walk.js";
+import { join, relative, sep } from "node:path";
+import { collectMarkdown } from "./fs-walk.js";
 import type { RunOpenSpec } from "./openspec-binary.js";
 import { runStatus } from "./openspec-data.js";
 import type { ScopedReader } from "./safe-file.js";
@@ -84,7 +84,9 @@ export async function resolveArtifactsFromBinary(
   const artifactPaths = status.artifactPaths ?? {};
 
   const artifacts: ResolvedArtifact[] = [];
-  for (const artifact of status.artifacts) {
+  // Defensive against a status body that omits `artifacts` (version drift, partial output):
+  // resolve to no artifacts rather than throwing a `not iterable` TypeError to the caller.
+  for (const artifact of status.artifacts ?? []) {
     const existing = artifactPaths[artifact.id]?.existingOutputPaths ?? [];
     const files = await Promise.all(existing.map((path) => toArtifactFile(deps, path)));
     artifacts.push({ id: artifact.id, status: artifact.status, files });
@@ -93,37 +95,32 @@ export async function resolveArtifactsFromBinary(
 }
 
 /**
- * The files an archived artifact maps to, by the spec-driven output conventions: a
- * root-level `<id>.md`, and/or an `<id>/` directory whose markdown belongs to that artifact
- * (e.g. `specs/**\/*.md`). Consumed paths are recorded so leftovers can be surfaced.
+ * The markdown an archived artifact maps to, selected from an already-collected list of every
+ * markdown file under the change, by the spec-driven output conventions: a root-level
+ * `<id>.md`, and/or an `<id>/` directory whose markdown belongs to that artifact (e.g.
+ * `specs/**\/*.md`). The trailing separator on the directory prefix keeps `spec` from also
+ * matching a sibling `specs/`. Selected paths are recorded so leftovers can be surfaced.
  */
-async function filesForArtifactId(
-  deps: AdapterDeps,
+function markdownForArtifactId(
   changeDir: string,
   id: string,
+  allMarkdown: string[],
   consumed: Set<string>,
-): Promise<ArtifactFile[]> {
-  const candidates: string[] = [];
-
+): string[] {
   const directFile = join(changeDir, `${id}.md`);
-  if ((await pathKind(directFile)) === "file") candidates.push(directFile);
+  const dirPrefix = join(changeDir, id) + sep;
 
-  const directory = join(changeDir, id);
-  if ((await pathKind(directory)) === "dir") candidates.push(...(await collectMarkdown(directory)));
-
-  const files: ArtifactFile[] = [];
-  for (const path of candidates) {
-    consumed.add(path);
-    files.push(await toArtifactFile(deps, path));
-  }
-  return files;
+  const selected = allMarkdown.filter((path) => path === directFile || path.startsWith(dirPrefix));
+  for (const path of selected) consumed.add(path);
+  return selected;
 }
 
 /**
  * Filesystem-backed source for an archived change: read the schema from `.openspec.yaml`,
  * get artifact order from `schemas --json`, and map files found by walking the change
- * directory onto artifacts. No `status --change` is attempted. Any markdown that matches no
- * artifact is surfaced under {@link UNATTRIBUTED_ARTIFACT_ID} rather than dropped.
+ * directory onto artifacts. No `status --change` is attempted. The change directory is walked
+ * exactly once; any markdown that matches no artifact is surfaced under
+ * {@link UNATTRIBUTED_ARTIFACT_ID} rather than dropped.
  */
 export async function resolveArtifactsFromFilesystem(
   deps: AdapterDeps,
@@ -136,14 +133,17 @@ export async function resolveArtifactsFromFilesystem(
   });
   const order = await resolveArtifactOrder(deps.run, schema.name);
 
+  const allMarkdown = await collectMarkdown(changeDir);
   const consumed = new Set<string>();
   const artifacts: ResolvedArtifact[] = [];
   for (const id of order) {
     // `status` is intentionally omitted: it was never persisted for an archived change.
-    artifacts.push({ id, files: await filesForArtifactId(deps, changeDir, id, consumed) });
+    const paths = markdownForArtifactId(changeDir, id, allMarkdown, consumed);
+    const files = await Promise.all(paths.map((path) => toArtifactFile(deps, path)));
+    artifacts.push({ id, files });
   }
 
-  const leftovers = (await collectMarkdown(changeDir)).filter((path) => !consumed.has(path));
+  const leftovers = allMarkdown.filter((path) => !consumed.has(path));
   if (leftovers.length > 0) {
     const files = await Promise.all(leftovers.map((path) => toArtifactFile(deps, path)));
     artifacts.push({ id: UNATTRIBUTED_ARTIFACT_ID, files });

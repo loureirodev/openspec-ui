@@ -22,6 +22,11 @@ describe("countCheckboxes", () => {
     expect(countCheckboxes(content)).toEqual({ completed: 1, total: 2 });
   });
 
+  it("counts checkboxes under any GFM list marker (`-`, `*`, `+`)", () => {
+    const content = ["- [x] dash", "* [ ] star", "+ [X] plus"].join("\n");
+    expect(countCheckboxes(content)).toEqual({ completed: 2, total: 3 });
+  });
+
   it("reports zero for content with no checkboxes", () => {
     expect(countCheckboxes("just some words")).toEqual({ completed: 0, total: 0 });
   });

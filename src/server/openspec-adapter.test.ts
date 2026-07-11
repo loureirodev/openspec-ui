@@ -97,8 +97,11 @@ describe("listChanges — error isolation", () => {
   });
 
   it("returns healthy changes normally and the failing one as an error entry", async () => {
-    const items = await listChanges(options);
-    const byName = Object.fromEntries(items.map((item) => [item.name, item]));
+    const { changes, error } = await listChanges(options);
+    const byName = Object.fromEntries(changes.map((item) => [item.name, item]));
+
+    // The binary list succeeded, so there is no top-level error.
+    expect(error).toBeUndefined();
 
     expect(byName.active_one ?? byName["active-one"]).toBeDefined();
     expect(byName["active-one"]?.error).toBeUndefined();
@@ -114,8 +117,27 @@ describe("listChanges — error isolation", () => {
   });
 
   it("still returns the other changes when one fails — the list is not aborted", async () => {
-    const items = await listChanges(options);
-    expect(items.map((item) => item.name).sort()).toEqual(["active-one", "corrupt", "healthy"]);
+    const { changes } = await listChanges(options);
+    expect(changes.map((item) => item.name).sort()).toEqual(["active-one", "corrupt", "healthy"]);
+  });
+
+  it("degrades to a partial list — archived changes plus a top-level error — when the binary list fails", async () => {
+    // `list` returns non-JSON, so runListChanges rejects with a tool error.
+    const { changes, error } = await listChanges({
+      projectRoot: root,
+      run: runFor({ list: { stdout: "spawn ENOENT" }, schemas: { stdout: SCHEMAS_STDOUT } }),
+    });
+
+    // The binary failure is surfaced at the top level rather than thrown.
+    expect(error?.kind).toBe("tool");
+
+    // Archived changes come from the filesystem, so they are still listed. No active change is.
+    expect(changes.map((item) => item.name).sort()).toEqual(["corrupt", "healthy"]);
+    expect(changes.every((item) => item.archived)).toBe(true);
+    expect(changes.find((item) => item.name === "healthy")).toMatchObject({
+      completedTasks: 1,
+      totalTasks: 2,
+    });
   });
 });
 

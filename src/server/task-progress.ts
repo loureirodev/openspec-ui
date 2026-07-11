@@ -11,11 +11,14 @@ export interface Progress {
   total: number;
 }
 
-/** Any markdown checkbox: `- [ ]`, `- [x]` or `- [X]`, with optional leading indentation. */
-const CHECKBOX = /^\s*- \[[ xX]\]/;
+/**
+ * Any markdown task checkbox, with optional leading indentation and any GFM list marker
+ * (`-`, `*` or `+`): `- [ ]`, `* [x]`, `+ [X]`, and so on.
+ */
+const CHECKBOX = /^\s*[-*+] \[[ xX]\]/;
 
-/** A *checked* checkbox: `- [x]` or `- [X]`. */
-const CHECKED = /^\s*- \[[xX]\]/;
+/** A *checked* checkbox: `[x]` or `[X]`, under any list marker. */
+const CHECKED = /^\s*[-*+] \[[xX]\]/;
 
 /**
  * Counts checkbox lines in one file's contents. A `[x]`/`[X]` line counts as complete, a
