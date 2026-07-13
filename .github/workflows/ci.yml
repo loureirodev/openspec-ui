@@ -41,3 +41,29 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  react-health:
+    name: React health (react-doctor)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: React health gate
+        # This runner has network access, so the supply-chain scan (Socket.dev) stays on by
+        # default. An offline/air-gapped runner would add --no-supply-chain to skip it.
+        run: |
+          score=$(pnpm exec react-doctor --score -y)
+          echo "react-doctor score: $score"
+          if [ "$score" -lt 50 ]; then
+            echo "Score $score is below the minimum threshold of 50."
+            exit 1
+          fi
