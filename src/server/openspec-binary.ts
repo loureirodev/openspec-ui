@@ -105,10 +105,21 @@ export function isSupportedVersion(version: string): boolean {
 
 /**
  * Whether the working directory resolves to an OpenSpec project. The binary is the
- * sole authority: a non-zero exit is a negative result, and the filesystem is never
- * inspected for an `openspec/` directory.
+ * sole authority; the filesystem is never inspected for an `openspec/` directory.
+ *
+ * A zero exit is necessary but no longer sufficient. Since 1.6.0, `list --json`
+ * succeeds even outside a project by falling back to an `implicit` root anchored at
+ * the working directory, so we inspect the reported `root.source`: only a resolved
+ * root (`nearest`, `declared`, `store`) counts as a project; `implicit` does not.
  */
 export async function isOpenSpecProject(run: RunOpenSpec): Promise<boolean> {
-  const { exitCode } = await run(["list", "--json"], { captureStdout: false });
-  return exitCode === 0;
+  const { exitCode, stdout } = await run(["list", "--json"]);
+  if (exitCode !== 0) return false;
+
+  try {
+    const parsed = JSON.parse(stdout) as { root?: { source?: string } };
+    return parsed.root?.source !== undefined && parsed.root.source !== "implicit";
+  } catch {
+    return false;
+  }
 }

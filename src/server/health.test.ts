@@ -9,7 +9,7 @@ interface StubEnvironment {
   binaryPath?: string | null;
   /** The version the binary reports, or `null` when `--version` fails. */
   version?: string | null;
-  /** Whether `openspec list --json` exits zero. */
+  /** Whether `openspec list --json` resolves a real project root. */
   isProject?: boolean;
 }
 
@@ -33,9 +33,14 @@ function stubEnvironment(environment: StubEnvironment): HealthDependencies & { c
           : { exitCode: 0, stdout: `${version}\n`, stderr: "" };
       }
       if (args[0] === "list") {
-        return isProject
-          ? { exitCode: 0, stdout: "[]", stderr: "" }
-          : { exitCode: 1, stdout: "", stderr: "not an OpenSpec project" };
+        // Since 1.6.0 the command exits zero even outside a project, distinguishing the
+        // two cases through the resolved root's source rather than the exit code.
+        const source = isProject ? "nearest" : "implicit";
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify({ changes: [], root: { path: "/p", source } }),
+          stderr: "",
+        };
       }
       throw new Error(`unexpected command: openspec ${args.join(" ")}`);
     },

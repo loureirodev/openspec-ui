@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CommandResult, RunOpenSpec, RunOptions } from "./openspec-binary.js";
+import type { CommandResult, RunOpenSpec } from "./openspec-binary.js";
 import { detectVersion, isOpenSpecProject, isSupportedVersion } from "./openspec-binary.js";
 
 function stubRun(result: Partial<CommandResult>): RunOpenSpec {
@@ -53,23 +53,37 @@ describe("detectVersion", () => {
 });
 
 describe("isOpenSpecProject", () => {
-  it("treats a zero exit as a project", async () => {
-    expect(await isOpenSpecProject(stubRun({ exitCode: 0, stdout: "[]" }))).toBe(true);
+  const listJson = (source: string) =>
+    JSON.stringify({ changes: [], root: { path: "/p", source } });
+
+  it("treats a resolved root as a project", async () => {
+    expect(await isOpenSpecProject(stubRun({ exitCode: 0, stdout: listJson("nearest") }))).toBe(
+      true,
+    );
+  });
+
+  it("treats a declared-store root as a project", async () => {
+    expect(await isOpenSpecProject(stubRun({ exitCode: 0, stdout: listJson("declared") }))).toBe(
+      true,
+    );
+  });
+
+  it("treats an implicit root as not a project", async () => {
+    // Since 1.6.0 the command exits zero outside a project, anchoring an implicit root at cwd.
+    expect(await isOpenSpecProject(stubRun({ exitCode: 0, stdout: listJson("implicit") }))).toBe(
+      false,
+    );
   });
 
   it("treats a non-zero exit as not a project", async () => {
     expect(await isOpenSpecProject(stubRun({ exitCode: 1, stderr: "not a project" }))).toBe(false);
   });
 
-  it("does not capture stdout, since only the exit code is inspected", async () => {
-    let received: RunOptions | undefined;
-    const run: RunOpenSpec = async (_args, options) => {
-      received = options;
-      return { exitCode: 0, stdout: "", stderr: "" };
-    };
+  it("treats unparseable output as not a project", async () => {
+    expect(await isOpenSpecProject(stubRun({ exitCode: 0, stdout: "not json" }))).toBe(false);
+  });
 
-    await isOpenSpecProject(run);
-
-    expect(received?.captureStdout).toBe(false);
+  it("treats output without a root as not a project", async () => {
+    expect(await isOpenSpecProject(stubRun({ exitCode: 0, stdout: "{}" }))).toBe(false);
   });
 });
