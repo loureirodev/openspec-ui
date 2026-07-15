@@ -91,7 +91,7 @@ export function parseCommandJson<T>(result: CommandResult, command: string): T {
   return data as T;
 }
 
-// --- Typed result shapes, as emitted by openspec >= 1.5.0 --------------------------------
+// --- Typed result shapes, as emitted by openspec >= 1.6.0 --------------------------------
 
 /** One change as reported by `list --json`. */
 export interface ChangeSummary {

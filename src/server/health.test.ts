@@ -113,19 +113,26 @@ describe("checkHealth", () => {
   });
 
   it("rejects a prerelease of the minimum version", async () => {
-    const result = await checkHealth(stubEnvironment({ version: "1.5.0-beta.1" }));
+    const result = await checkHealth(stubEnvironment({ version: "1.6.0-beta.1" }));
 
     expect(result.check).toBe("version");
-    expect(result.version).toBe("1.5.0-beta.1");
+    expect(result.version).toBe("1.6.0-beta.1");
+  });
+
+  it("rejects the previous minimum version", async () => {
+    const result = await checkHealth(stubEnvironment({ version: "1.5.0" }));
+
+    expect(result.check).toBe("version");
+    expect(result.version).toBe("1.5.0");
   });
 
   it("accepts a prerelease of a version newer than the minimum", async () => {
-    const result = await checkHealth(stubEnvironment({ version: "1.6.0-rc.1" }));
+    const result = await checkHealth(stubEnvironment({ version: "1.7.0-rc.1" }));
 
     expect(result).toEqual({
       status: "ok",
       resolvedBinaryPath: BINARY_PATH,
-      version: "1.6.0-rc.1",
+      version: "1.7.0-rc.1",
     });
   });
 

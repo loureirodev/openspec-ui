@@ -8,7 +8,7 @@ function stubRun(result: Partial<CommandResult>): RunOpenSpec {
 
 describe("isSupportedVersion", () => {
   it("accepts the exact minimum version", () => {
-    expect(isSupportedVersion("1.5.0")).toBe(true);
+    expect(isSupportedVersion("1.6.0")).toBe(true);
   });
 
   it("accepts a newer version", () => {
@@ -19,8 +19,12 @@ describe("isSupportedVersion", () => {
     expect(isSupportedVersion("1.2.0")).toBe(false);
   });
 
+  it("rejects the previous minimum version", () => {
+    expect(isSupportedVersion("1.5.0")).toBe(false);
+  });
+
   it("rejects a prerelease of the minimum version", () => {
-    expect(isSupportedVersion("1.5.0-beta.1")).toBe(false);
+    expect(isSupportedVersion("1.6.0-beta.1")).toBe(false);
   });
 });
 

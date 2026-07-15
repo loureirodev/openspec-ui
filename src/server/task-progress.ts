@@ -1,8 +1,10 @@
 /**
  * Task-progress counting. Pure functions over file contents: they never read disk or the
- * binary, so a change detail can recompute exact progress from its task files independently
- * of the count `list --json` reports. The two numbers can legitimately disagree for a custom
- * multi-file schema; this module makes each individually correct and reconciles neither.
+ * binary, so progress can be recomputed from already-loaded task markdown. This is the only
+ * source for archived changes, which never appear in `list --json`, and it costs nothing extra
+ * for the change detail view, which loads every task file to render it anyway. For active
+ * changes, `list --json`'s count is authoritative; the two may still be compared, but this
+ * module makes each individually correct and reconciles neither.
  */
 
 /** The completed and total checkbox counts for one or more task files. */

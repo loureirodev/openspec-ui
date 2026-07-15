@@ -304,8 +304,10 @@ export async function listChanges(options: AdapterOptions = {}): Promise<ChangeL
 
 /**
  * Resolves a change's full detail: its artifacts (from the provenance-selected source) and its
- * progress recomputed from the task artifact's files, so a detail view never trusts the list's
- * count. The two counts may legitimately disagree; each is individually correct.
+ * progress recomputed from the task artifact's files. Recomputation costs nothing extra here —
+ * the detail view already loads every task file to render it — and it is the only option for
+ * archived changes, which the binary never reports counts for. The recomputed and list counts
+ * may still be compared elsewhere; each is individually correct and neither is reconciled.
  */
 export async function resolveChange(
   ref: ChangeRef,
