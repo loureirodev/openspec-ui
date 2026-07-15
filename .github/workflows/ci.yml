@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 jobs:
   # Later changes add their own quality gates — `markdown-viewer` adds react-doctor —

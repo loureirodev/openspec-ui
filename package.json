@@ -1,9 +1,13 @@
 {
-  "name": "openspec-dashboard",
-  "version": "0.0.0",
+  "name": "@loureirodev/openspec-ui",
+  "version": "0.1.0",
   "description": "A read-only dashboard for browsing OpenSpec changes, archives and specs.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/loureirodev/openspec-ui.git"
+  },
   "engines": {
     "node": ">=22"
   },
