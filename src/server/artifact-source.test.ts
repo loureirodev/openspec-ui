@@ -68,7 +68,7 @@ describe("resolveArtifactsFromBinary", () => {
       openspecRoot: OPENSPEC_ROOT,
     };
 
-    const artifacts = await resolveArtifactsFromBinary(deps, "demo");
+    const { artifacts } = await resolveArtifactsFromBinary(deps, "demo");
 
     expect(artifacts.map((a) => a.id)).toEqual(["proposal", "specs"]);
     expect(artifacts[0]?.status).toBe("done");
@@ -77,6 +77,34 @@ describe("resolveArtifactsFromBinary", () => {
       "openspec/changes/demo/specs/b/spec.md",
     ]);
     expect(artifacts[0]?.files[0]?.markdown).toBe("# proposal");
+  });
+
+  it("carries a blocked artifact's `missingDeps` and the status body's `nextSteps`", async () => {
+    const status = {
+      changeName: "demo",
+      schemaName: "spec-driven",
+      artifacts: [
+        { id: "proposal", outputPath: "proposal.md", status: "done" },
+        { id: "design", outputPath: "design.md", status: "blocked", missingDeps: ["proposal"] },
+      ],
+      artifactPaths: {
+        proposal: { existingOutputPaths: ["/proj/openspec/changes/demo/proposal.md"] },
+        design: { existingOutputPaths: [] },
+      },
+      nextSteps: ["Write the proposal first."],
+    };
+    const deps: AdapterDeps = {
+      run: runFor({ status: { stdout: JSON.stringify(status) } }),
+      readScoped: readerFor({ "/proj/openspec/changes/demo/proposal.md": "# proposal" }),
+      projectRoot: PROJECT_ROOT,
+      openspecRoot: OPENSPEC_ROOT,
+    };
+
+    const { artifacts, nextSteps } = await resolveArtifactsFromBinary(deps, "demo");
+
+    expect(artifacts[1]?.status).toBe("blocked");
+    expect(artifacts[1]?.missingDeps).toEqual(["proposal"]);
+    expect(nextSteps).toEqual(["Write the proposal first."]);
   });
 
   it("handles a custom schema's artifact ids without special-casing", async () => {
@@ -93,7 +121,7 @@ describe("resolveArtifactsFromBinary", () => {
       openspecRoot: OPENSPEC_ROOT,
     };
 
-    const artifacts = await resolveArtifactsFromBinary(deps, "demo");
+    const { artifacts } = await resolveArtifactsFromBinary(deps, "demo");
 
     expect(artifacts).toHaveLength(1);
     expect(artifacts[0]?.id).toBe("rfc");
@@ -108,7 +136,7 @@ describe("resolveArtifactsFromBinary", () => {
       openspecRoot: OPENSPEC_ROOT,
     };
 
-    await expect(resolveArtifactsFromBinary(deps, "demo")).resolves.toEqual([]);
+    await expect(resolveArtifactsFromBinary(deps, "demo")).resolves.toEqual({ artifacts: [] });
   });
 });
 
@@ -147,11 +175,13 @@ describe("resolveArtifactsFromFilesystem", () => {
   });
 
   it("resolves artifacts by walking the directory, in schema order, with no status field", async () => {
-    const artifacts = await resolveArtifactsFromFilesystem(deps, changeDir);
+    const { artifacts, nextSteps } = await resolveArtifactsFromFilesystem(deps, changeDir);
 
     expect(artifacts.map((a) => a.id)).toEqual(["proposal", "specs", "design", "tasks"]);
-    // Honest degradation: the binary's status is not fabricated.
+    // Honest degradation: the binary's status and missingDeps are not fabricated.
     expect(artifacts.every((a) => a.status === undefined)).toBe(true);
+    expect(artifacts.every((a) => a.missingDeps === undefined)).toBe(true);
+    expect(nextSteps).toBeUndefined();
     expect(artifacts[1]?.files.map((f) => f.markdown)).toEqual(["# spec"]);
     expect(artifacts[0]?.files[0]?.markdown).toBe("# proposal");
   });
@@ -159,7 +189,7 @@ describe("resolveArtifactsFromFilesystem", () => {
   it("surfaces markdown that matches no artifact rather than dropping it", async () => {
     await writeFile(join(changeDir, "notes.md"), "# stray", "utf8");
 
-    const artifacts = await resolveArtifactsFromFilesystem(deps, changeDir);
+    const { artifacts } = await resolveArtifactsFromFilesystem(deps, changeDir);
     const unattributed = artifacts.find((a) => a.id === UNATTRIBUTED_ARTIFACT_ID);
 
     expect(unattributed?.files.map((f) => f.markdown)).toEqual(["# stray"]);
@@ -182,7 +212,7 @@ describe("resolveArtifacts (provenance selection)", () => {
       openspecRoot: OPENSPEC_ROOT,
     };
 
-    const artifacts = await resolveArtifacts(deps, {
+    const { artifacts } = await resolveArtifacts(deps, {
       name: "demo",
       archived: false,
       changeDir: "/proj/openspec/changes/demo",

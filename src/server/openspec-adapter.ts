@@ -89,6 +89,15 @@ export interface ResolvedChange {
   artifacts: ResolvedArtifact[];
   /** Progress recomputed from the change's task files — independent of the `list --json` count. */
   progress: Progress;
+  /** The binary's suggested next steps; present only for the binary source. */
+  nextSteps?: string[];
+}
+
+/** One archived change discovered on the filesystem, with its name and archived date. */
+export interface ArchivedChangeSummary {
+  name: string;
+  /** The `YYYY-MM-DD` date recovered from the archive directory's name prefix. */
+  archivedDate: string;
 }
 
 /** The adapter's public dependencies. A project root is enough to derive everything else. */
@@ -115,22 +124,70 @@ function archiveRoot(deps: AdapterDeps): string {
   return join(deps.openspecRoot, "changes", "archive");
 }
 
-/** Discovers archived changes by listing the archive directory; the binary cannot see them. */
-async function discoverArchivedRefs(deps: AdapterDeps): Promise<ChangeRef[]> {
+/** An archive directory's `YYYY-MM-DD-<name>` convention, split into its two parts. */
+const ARCHIVE_DIR_PATTERN = /^(\d{4}-\d{2}-\d{2})-(.+)$/;
+
+/** One archive directory entry, parsed once and shared by every archived-list consumer below. */
+interface ArchiveDirEntry {
+  name: string;
+  archivedDate: string;
+  changeDir: string;
+}
+
+/** Lists the archive directory's entries, parsing the `YYYY-MM-DD-<name>` convention once. */
+async function listArchiveDirEntries(deps: AdapterDeps): Promise<ArchiveDirEntry[]> {
   const root = archiveRoot(deps);
   try {
     const entries = await readdir(root, { withFileTypes: true });
     return entries
       .filter((entry) => entry.isDirectory())
-      .map((entry) => ({
-        // Strip the archival `YYYY-MM-DD-` prefix to recover the change's original name.
-        name: entry.name.replace(/^\d{4}-\d{2}-\d{2}-/, ""),
-        archived: true,
-        changeDir: join(root, entry.name),
-      }));
+      .map((entry) => {
+        const match = ARCHIVE_DIR_PATTERN.exec(entry.name);
+        return {
+          // Strip the archival `YYYY-MM-DD-` prefix to recover the change's original name.
+          name: match?.[2] ?? entry.name,
+          archivedDate: match?.[1] ?? "",
+          changeDir: join(root, entry.name),
+        };
+      });
   } catch {
     return [];
   }
+}
+
+/** Discovers archived changes by listing the archive directory; the binary cannot see them. */
+async function discoverArchivedRefs(deps: AdapterDeps): Promise<ChangeRef[]> {
+  const entries = await listArchiveDirEntries(deps);
+  return entries.map(({ name, changeDir }) => ({ name, archived: true, changeDir }));
+}
+
+/**
+ * Lists every archived change with its name and archived date, independent of the binary and
+ * of {@link listChanges}'s per-change resolution — the archived list endpoint needs neither
+ * schema nor progress, only what the directory listing itself already carries.
+ */
+export async function listArchivedChanges(
+  options: AdapterOptions = {},
+): Promise<ArchivedChangeSummary[]> {
+  const deps = resolveDeps(options);
+  const entries = await listArchiveDirEntries(deps);
+  return entries.map(({ name, archivedDate }) => ({ name, archivedDate }));
+}
+
+/** Finds the {@link ChangeRef} for one archived change by its (de-prefixed) name, or `null`. */
+export async function findArchivedChange(
+  name: string,
+  options: AdapterOptions = {},
+): Promise<ChangeRef | null> {
+  const deps = resolveDeps(options);
+  const refs = await discoverArchivedRefs(deps);
+  return refs.find((ref) => ref.name === name) ?? null;
+}
+
+/** The {@link ChangeRef} for an active change name, by the binary's directory convention. */
+export function activeChangeRef(name: string, options: AdapterOptions = {}): ChangeRef {
+  const deps = resolveDeps(options);
+  return { name, archived: false, changeDir: join(deps.openspecRoot, "changes", name) };
 }
 
 /** The markdown of a change's task files, by the default-schema convention (`tasks.md`, `tasks/`). */
@@ -261,7 +318,7 @@ export async function resolveChange(
     openspecRoot: deps.openspecRoot,
     changeDir: ref.changeDir,
   });
-  const artifacts = await resolveArtifacts(deps, ref);
+  const { artifacts, nextSteps } = await resolveArtifacts(deps, ref);
 
   const taskMarkdown = artifacts
     .filter((artifact) => artifact.id === TASKS_ARTIFACT_ID)
@@ -273,6 +330,7 @@ export async function resolveChange(
     schema,
     artifacts,
     progress: aggregateProgress(taskMarkdown),
+    nextSteps,
   };
 }
 

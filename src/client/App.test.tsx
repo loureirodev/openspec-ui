@@ -14,17 +14,40 @@ const HEALTHY: HealthResponse = {
   version: MINIMUM_OPENSPEC_VERSION,
 };
 
-/** Resolves the next `/api/health` request with `health`, one call at a time. */
+/** The path a `fetch` call was made with, whether given a string or a `Request`. */
+function requestPath(input: RequestInfo | URL): string {
+  return typeof input === "string" ? input : input instanceof Request ? input.url : input.href;
+}
+
+/**
+ * Resolves `/api/health` requests with `health`, one call at a time, and answers every other
+ * API path with an empty-but-valid body — this suite exercises the shell and navigation, not
+ * the routed pages' own data, so their queries just need to resolve without error.
+ */
 function mockHealth(...responses: HealthResponse[]) {
-  const fetchMock = vi.fn(async () => {
-    const health = responses.length > 1 ? responses.shift() : responses[0];
-    return new Response(JSON.stringify(health), {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const path = requestPath(input);
+    if (path.includes("/api/health")) {
+      const health = responses.length > 1 ? responses.shift() : responses[0];
+      return new Response(JSON.stringify(health), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const body = path.includes("/api/changes") ? { changes: [] } : [];
+    return new Response(JSON.stringify(body), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
+}
+
+/** Counts only the `/api/health` calls a health-mocked `fetch` received. */
+function healthCallCount(fetchMock: ReturnType<typeof vi.fn>): number {
+  return fetchMock.mock.calls.filter(([input]) => requestPath(input).includes("/api/health"))
+    .length;
 }
 
 /** A deferred `/api/health` so the pending state can be observed. */
@@ -195,11 +218,11 @@ describe("the refresh control", () => {
     const fetchMock = mockHealth(HEALTHY);
     renderApp();
     await screen.findByRole("heading", { name: "Changes" });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(healthCallCount(fetchMock)).toBe(1);
 
     await userEvent.click(screen.getByRole("button", { name: /refresh/i }));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(healthCallCount(fetchMock)).toBe(2));
   });
 
   it("renders the routed page after the environment is repaired and refreshed", async () => {

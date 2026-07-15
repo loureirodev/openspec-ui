@@ -123,6 +123,8 @@ export interface ArtifactStatus {
   id: string;
   outputPath: string;
   status: string;
+  /** The ids of dependency artifacts still missing, present only when `status` is `blocked`. */
+  missingDeps?: string[];
 }
 
 /** The resolved file paths for one artifact, as reported by `status --change`. */

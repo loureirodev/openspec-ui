@@ -36,7 +36,20 @@ export interface ArtifactFile {
 export interface ResolvedArtifact {
   id: string;
   status?: string;
+  /** The ids of dependency artifacts still missing; present only for a `blocked` binary artifact. */
+  missingDeps?: string[];
+  /** Set by the archived detail route on spec-delta artifacts, to frame them as history. */
+  historical?: boolean;
   files: ArtifactFile[];
+}
+
+/** The result of resolving one change's artifacts: the artifacts and, for the binary source
+ * only, the `nextSteps` the binary's `status` reported. Absent for the archived filesystem
+ * source, which never had a `status` call to report them from.
+ */
+export interface ResolvedArtifacts {
+  artifacts: ResolvedArtifact[];
+  nextSteps?: string[];
 }
 
 /** The artifact id under which files that match no schema artifact are surfaced, not dropped. */
@@ -79,7 +92,7 @@ async function toArtifactFile(deps: AdapterDeps, path: string): Promise<Artifact
 export async function resolveArtifactsFromBinary(
   deps: AdapterDeps,
   changeName: string,
-): Promise<ResolvedArtifact[]> {
+): Promise<ResolvedArtifacts> {
   const status = await runStatus(deps.run, changeName);
   const artifactPaths = status.artifactPaths ?? {};
 
@@ -89,9 +102,14 @@ export async function resolveArtifactsFromBinary(
   for (const artifact of status.artifacts ?? []) {
     const existing = artifactPaths[artifact.id]?.existingOutputPaths ?? [];
     const files = await Promise.all(existing.map((path) => toArtifactFile(deps, path)));
-    artifacts.push({ id: artifact.id, status: artifact.status, files });
+    artifacts.push({
+      id: artifact.id,
+      status: artifact.status,
+      missingDeps: artifact.missingDeps,
+      files,
+    });
   }
-  return artifacts;
+  return { artifacts, nextSteps: status.nextSteps };
 }
 
 /**
@@ -125,7 +143,7 @@ function markdownForArtifactId(
 export async function resolveArtifactsFromFilesystem(
   deps: AdapterDeps,
   changeDir: string,
-): Promise<ResolvedArtifact[]> {
+): Promise<ResolvedArtifacts> {
   const schema = await resolveSchemaName({
     readScoped: deps.readScoped,
     openspecRoot: deps.openspecRoot,
@@ -137,7 +155,8 @@ export async function resolveArtifactsFromFilesystem(
   const consumed = new Set<string>();
   const artifacts: ResolvedArtifact[] = [];
   for (const id of order) {
-    // `status` is intentionally omitted: it was never persisted for an archived change.
+    // `status` and `missingDeps` are intentionally omitted: neither was persisted for an
+    // archived change.
     const paths = markdownForArtifactId(changeDir, id, allMarkdown, consumed);
     const files = await Promise.all(paths.map((path) => toArtifactFile(deps, path)));
     artifacts.push({ id, files });
@@ -148,7 +167,8 @@ export async function resolveArtifactsFromFilesystem(
     const files = await Promise.all(leftovers.map((path) => toArtifactFile(deps, path)));
     artifacts.push({ id: UNATTRIBUTED_ARTIFACT_ID, files });
   }
-  return artifacts;
+  // No `nextSteps`: those come only from a binary `status` call, never attempted here.
+  return { artifacts };
 }
 
 /**
@@ -159,7 +179,7 @@ export async function resolveArtifactsFromFilesystem(
 export async function resolveArtifacts(
   deps: AdapterDeps,
   ref: ChangeRef,
-): Promise<ResolvedArtifact[]> {
+): Promise<ResolvedArtifacts> {
   return ref.archived
     ? resolveArtifactsFromFilesystem(deps, ref.changeDir)
     : resolveArtifactsFromBinary(deps, ref.name);

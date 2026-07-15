@@ -1,9 +1,10 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { HealthResponse } from "../shared/health.js";
 import { createApp } from "./app.js";
+import type { CommandResult, RunOpenSpec } from "./openspec-binary.js";
 
 const INDEX_HTML = '<!doctype html><html><body><div id="root"></div></body></html>';
 const ASSET_JS = "console.log('spa');";
@@ -119,5 +120,211 @@ describe("the SPA fallback", () => {
 
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toBe(INDEX_HTML);
+  });
+});
+
+/** Serves canned command output keyed by the first distinguishing token, as in the adapter's own tests. */
+function runFor(byCommand: Record<string, Partial<CommandResult>>): RunOpenSpec {
+  return async (args) => {
+    const key = args.includes("schemas") ? "schemas" : args.includes("status") ? "status" : "list";
+    const result = byCommand[key] ?? { exitCode: 0, stdout: "null", stderr: "" };
+    return { exitCode: 0, stdout: "", stderr: "", ...result };
+  };
+}
+
+const SCHEMAS_STDOUT = JSON.stringify([
+  { name: "spec-driven", artifacts: ["proposal", "specs", "design", "tasks"] },
+]);
+
+describe("the changes and archived API routes", () => {
+  let root: string;
+
+  function appFor(run: RunOpenSpec) {
+    return createApp({ clientDir, adapterOptions: { projectRoot: root, run } });
+  }
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), "openspec-dashboard-app-"));
+    const openspecRoot = join(root, "openspec");
+
+    // An active change the binary can resolve via `status --change`.
+    const activeDir = join(openspecRoot, "changes", "active-one");
+    await mkdir(activeDir, { recursive: true });
+    await writeFile(join(activeDir, ".openspec.yaml"), "schema: spec-driven\n", "utf8");
+    await writeFile(join(activeDir, "proposal.md"), "# proposal", "utf8");
+    await writeFile(join(activeDir, "tasks.md"), "- [x] a\n- [ ] b\n", "utf8");
+
+    // An archived change resolved entirely from the filesystem.
+    const archiveDir = join(openspecRoot, "changes", "archive", "2026-07-01-old-feature");
+    await mkdir(join(archiveDir, "specs", "core"), { recursive: true });
+    await writeFile(join(archiveDir, ".openspec.yaml"), "schema: spec-driven\n", "utf8");
+    await writeFile(join(archiveDir, "proposal.md"), "# proposal", "utf8");
+    await writeFile(join(archiveDir, "tasks.md"), "- [x] one\n- [ ] two\n", "utf8");
+    await writeFile(join(archiveDir, "specs", "core", "spec.md"), "# core spec", "utf8");
+
+    // A second archived change whose `tasks.md` escapes the tree via symlink: reading it must
+    // fail *this* change only, and it must still appear in the list as an error entry.
+    const corruptDir = join(openspecRoot, "changes", "archive", "2026-07-02-corrupt");
+    await mkdir(corruptDir, { recursive: true });
+    await writeFile(join(corruptDir, ".openspec.yaml"), "schema: spec-driven\n", "utf8");
+    await writeFile(join(root, "outside.md"), "- [x] leaked", "utf8");
+    await symlink(join(root, "outside.md"), join(corruptDir, "tasks.md"));
+  });
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  describe("GET /api/changes", () => {
+    it("returns 200 with the resolved active and archived changes", async () => {
+      const status = {
+        changeName: "active-one",
+        schemaName: "spec-driven",
+        artifacts: [{ id: "proposal", outputPath: "proposal.md", status: "done" }],
+        artifactPaths: {
+          proposal: {
+            existingOutputPaths: [join(root, "openspec/changes/active-one/proposal.md")],
+          },
+        },
+      };
+      const app = appFor(
+        runFor({
+          list: {
+            stdout: JSON.stringify({
+              changes: [
+                {
+                  name: "active-one",
+                  completedTasks: 1,
+                  totalTasks: 2,
+                  status: "in-progress",
+                  lastModified: "2026-07-10T00:00:00.000Z",
+                },
+              ],
+            }),
+          },
+          status: { stdout: JSON.stringify(status) },
+          schemas: { stdout: SCHEMAS_STDOUT },
+        }),
+      );
+
+      const response = await app.request("/api/changes");
+      expect(response.status).toBe(200);
+
+      const body = (await response.json()) as {
+        error?: unknown;
+        changes: Array<{ name: string; error?: unknown }>;
+      };
+      expect(body.error).toBeUndefined();
+      const byName = Object.fromEntries(body.changes.map((c) => [c.name, c]));
+      expect(byName["active-one"]).toBeDefined();
+      expect(byName["old-feature"]).toBeDefined();
+      // The corrupt archived change is isolated as an error entry, not thrown.
+      expect(byName.corrupt?.error).toBeDefined();
+    });
+
+    it("returns 200 with a top-level error when the binary list fails, keeping archived changes", async () => {
+      const app = appFor(
+        runFor({ list: { stdout: "not json" }, schemas: { stdout: SCHEMAS_STDOUT } }),
+      );
+
+      const response = await app.request("/api/changes");
+      expect(response.status).toBe(200);
+
+      const body = (await response.json()) as {
+        error?: { kind: string };
+        changes: Array<{ name: string; archived: boolean }>;
+      };
+      expect(body.error?.kind).toBe("tool");
+      expect(body.changes.every((c) => c.archived)).toBe(true);
+      expect(body.changes.map((c) => c.name).sort()).toEqual(["corrupt", "old-feature"]);
+    });
+  });
+
+  describe("GET /api/changes/:name", () => {
+    it("returns artifacts with inlined markdown and recomputed progress", async () => {
+      const status = {
+        changeName: "active-one",
+        schemaName: "spec-driven",
+        artifacts: [
+          { id: "proposal", outputPath: "proposal.md", status: "done" },
+          { id: "tasks", outputPath: "tasks.md", status: "in-progress" },
+        ],
+        artifactPaths: {
+          proposal: {
+            existingOutputPaths: [join(root, "openspec/changes/active-one/proposal.md")],
+          },
+          tasks: { existingOutputPaths: [join(root, "openspec/changes/active-one/tasks.md")] },
+        },
+        nextSteps: ["Finish the tasks."],
+      };
+      const app = appFor(
+        runFor({ status: { stdout: JSON.stringify(status) }, schemas: { stdout: SCHEMAS_STDOUT } }),
+      );
+
+      const response = await app.request("/api/changes/active-one");
+      expect(response.status).toBe(200);
+
+      const body = (await response.json()) as {
+        artifacts: Array<{ id: string; status?: string; files: Array<{ markdown: string }> }>;
+        progress: { completed: number; total: number };
+        nextSteps?: string[];
+      };
+      expect(body.artifacts.map((a) => a.id)).toEqual(["proposal", "tasks"]);
+      expect(body.artifacts[0]?.files[0]?.markdown).toBe("# proposal");
+      expect(body.progress).toEqual({ completed: 1, total: 2 });
+      expect(body.nextSteps).toEqual(["Finish the tasks."]);
+    });
+
+    it("returns 404 for a name the binary does not recognize as an active change", async () => {
+      const validationBody = JSON.stringify({
+        status: [{ severity: "error", message: "Change 'ghost' not found." }],
+      });
+      const app = appFor(
+        runFor({ status: { stdout: validationBody }, schemas: { stdout: SCHEMAS_STDOUT } }),
+      );
+
+      const response = await app.request("/api/changes/ghost");
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe("GET /api/archived", () => {
+    it("returns 200 with each archived change's name and archived date, independent of the binary", async () => {
+      const app = appFor(runFor({ list: { stdout: "not json" } }));
+
+      const response = await app.request("/api/archived");
+      expect(response.status).toBe(200);
+
+      const body = (await response.json()) as Array<{ name: string; archivedDate: string }>;
+      expect(body).toEqual(
+        expect.arrayContaining([
+          { name: "old-feature", archivedDate: "2026-07-01" },
+          { name: "corrupt", archivedDate: "2026-07-02" },
+        ]),
+      );
+    });
+  });
+
+  describe("GET /api/archived/:id", () => {
+    it("returns the artifact shape with spec deltas flagged historical and no fabricated status", async () => {
+      const app = appFor(runFor({ schemas: { stdout: SCHEMAS_STDOUT } }));
+
+      const response = await app.request("/api/archived/old-feature");
+      expect(response.status).toBe(200);
+
+      const body = (await response.json()) as {
+        artifacts: Array<{ id: string; status?: string; historical?: boolean }>;
+      };
+      const specs = body.artifacts.find((a) => a.id === "specs");
+      expect(specs?.historical).toBe(true);
+      expect(body.artifacts.every((a) => a.status === undefined)).toBe(true);
+    });
+
+    it("returns 404 for an id that is not an archived change", async () => {
+      const app = appFor(runFor({ schemas: { stdout: SCHEMAS_STDOUT } }));
+
+      const response = await app.request("/api/archived/does-not-exist");
+      expect(response.status).toBe(404);
+    });
   });
 });
