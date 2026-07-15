@@ -55,8 +55,8 @@ importers:
         specifier: ^2.5.3
         version: 2.5.3
       '@fission-ai/openspec':
-        specifier: ^1.5.0
-        version: 1.5.0(@types/node@26.1.1)
+        specifier: ^1.6.0
+        version: 1.6.0(@types/node@26.1.1)
       '@testing-library/dom':
         specifier: ^10.4.1
         version: 10.4.1
@@ -362,8 +362,8 @@ packages:
       '@noble/hashes':
         optional: true
 
-  '@fission-ai/openspec@1.5.0':
-    resolution: {integrity: sha512-SLZkyF51gFYkISufZKaka0X04z4y/WCjPOcCB+EC7tALd0TC+7V76BOIzWOSIOhdhBWwh5EMIBhrgLnugIh1DA==}
+  '@fission-ai/openspec@1.6.0':
+    resolution: {integrity: sha512-7yFTQ3hrrk11mQ2ACClNv2gtAN0o116vCgwoiQKmreoB6ambSnrZh7wf2FNFoSDBXHBi9iiCQ7G16fG71ZNppA==}
     engines: {node: '>=20.19.0'}
     hasBin: true
 
@@ -3103,7 +3103,7 @@ snapshots:
 
   '@exodus/bytes@1.15.1': {}
 
-  '@fission-ai/openspec@1.5.0(@types/node@26.1.1)':
+  '@fission-ai/openspec@1.6.0(@types/node@26.1.1)':
     dependencies:
       '@inquirer/core': 10.3.2(@types/node@26.1.1)
       '@inquirer/prompts': 7.10.1(@types/node@26.1.1)
