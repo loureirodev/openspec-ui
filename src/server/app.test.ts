@@ -126,7 +126,15 @@ describe("the SPA fallback", () => {
 /** Serves canned command output keyed by the first distinguishing token, as in the adapter's own tests. */
 function runFor(byCommand: Record<string, Partial<CommandResult>>): RunOpenSpec {
   return async (args) => {
-    const key = args.includes("schemas") ? "schemas" : args.includes("status") ? "status" : "list";
+    const key = args.includes("schemas")
+      ? "schemas"
+      : args.includes("--specs")
+        ? "list-specs"
+        : args.includes("status")
+          ? "status"
+          : args.includes("show")
+            ? "show"
+            : "list";
     const result = byCommand[key] ?? { exitCode: 0, stdout: "null", stderr: "" };
     return { exitCode: 0, stdout: "", stderr: "", ...result };
   };
@@ -325,6 +333,112 @@ describe("the changes and archived API routes", () => {
 
       const response = await app.request("/api/archived/does-not-exist");
       expect(response.status).toBe(404);
+    });
+  });
+});
+
+describe("the specs API routes", () => {
+  let root: string;
+
+  function appFor(run: RunOpenSpec) {
+    return createApp({ clientDir, adapterOptions: { projectRoot: root, run } });
+  }
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), "openspec-dashboard-specs-"));
+    const specDir = join(root, "openspec", "specs", "core");
+    await mkdir(specDir, { recursive: true });
+    await writeFile(join(specDir, "spec.md"), "## Requirement: Core\n\nBody.", "utf8");
+  });
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  describe("GET /api/specs", () => {
+    it("returns 200 with the project's specs", async () => {
+      const app = appFor(
+        runFor({
+          "list-specs": {
+            stdout: JSON.stringify({ specs: [{ id: "core", requirementCount: 1 }] }),
+          },
+        }),
+      );
+
+      const response = await app.request("/api/specs");
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual([{ id: "core", requirementCount: 1 }]);
+    });
+
+    it("returns 200 with an empty list for a project with no specs", async () => {
+      const app = appFor(runFor({ "list-specs": { stdout: JSON.stringify({ specs: [] }) } }));
+
+      const response = await app.request("/api/specs");
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual([]);
+    });
+
+    it("returns a structured JSON 500 rather than an unhandled crash when the binary is broken", async () => {
+      const app = appFor(runFor({ "list-specs": { stdout: "not json" } }));
+
+      const response = await app.request("/api/specs");
+      expect(response.status).toBe(500);
+      expect(response.headers.get("content-type")).toContain("application/json");
+
+      const body = (await response.json()) as { error: string; kind: string };
+      expect(body.error).toBe("Internal Server Error");
+      expect(body.kind).toBe("tool");
+    });
+  });
+
+  describe("GET /api/specs/:id", () => {
+    it("returns 200 with the structured index and the raw markdown", async () => {
+      const detail = {
+        id: "core",
+        title: "Core",
+        requirementCount: 1,
+        requirements: [{ text: "Core", scenarios: [] }],
+      };
+      const app = appFor(runFor({ show: { stdout: JSON.stringify(detail) } }));
+
+      const response = await app.request("/api/specs/core");
+      expect(response.status).toBe(200);
+
+      const body = (await response.json()) as {
+        index?: unknown;
+        markdown: string;
+        error?: unknown;
+      };
+      expect(body.index).toEqual(detail);
+      expect(body.markdown).toBe("## Requirement: Core\n\nBody.");
+      expect(body.error).toBeUndefined();
+    });
+
+    it("returns 404 for a spec whose spec.md does not exist", async () => {
+      const app = appFor(runFor({}));
+
+      const response = await app.request("/api/specs/does-not-exist");
+      expect(response.status).toBe(404);
+    });
+
+    it("returns 200 with the raw markdown and a structured error when the index fails validation", async () => {
+      const validationBody = JSON.stringify({
+        status: [{ severity: "error", message: "Spec 'core' is invalid." }],
+      });
+      const app = appFor(runFor({ show: { stdout: validationBody } }));
+
+      const response = await app.request("/api/specs/core");
+      expect(response.status).toBe(200);
+
+      const body = (await response.json()) as {
+        index?: unknown;
+        markdown: string;
+        error?: { kind: string; details?: string[] };
+      };
+      expect(body.index).toBeUndefined();
+      expect(body.markdown).toBe("## Requirement: Core\n\nBody.");
+      expect(body.error?.kind).toBe("validation");
+      expect(body.error?.details).toEqual(["Spec 'core' is invalid."]);
     });
   });
 });

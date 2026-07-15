@@ -8,9 +8,12 @@ import {
   findArchivedChange,
   listArchivedChanges,
   listChanges,
+  listSpecs,
   OpenSpecValidationError,
   type ResolvedArtifact,
   resolveChange,
+  resolveSpec,
+  toStructuredError,
 } from "./openspec-adapter.js";
 import { contentTypeFor, readAsset, readIndexHtml } from "./static-files.js";
 
@@ -84,6 +87,29 @@ export function createApp(options: AppOptions = {}) {
 
     const resolved = await resolveChange(ref, adapterOptions);
     return c.json({ ...resolved, artifacts: withHistoricalFlag(resolved.artifacts) });
+  });
+
+  // The project's specs, as reported by `list --specs --json`. An empty project yields an
+  // empty list at 200, never an error — see specs-api's "Empty project" scenario. Unlike
+  // `/api/changes`, `listSpecs` has no per-item isolation to degrade into (there is no
+  // filesystem-only fallback for specs the way archived changes are for changes), so a broken
+  // binary is a genuine failure; it is still reported as structured JSON rather than the
+  // framework's default plain-text 500.
+  app.get("/api/specs", async (c) => {
+    try {
+      return c.json(await listSpecs(adapterOptions));
+    } catch (error) {
+      return c.json({ error: "Internal Server Error", ...toStructuredError(error) }, 500);
+    }
+  });
+
+  app.get("/api/specs/:id", async (c) => {
+    const id = c.req.param("id");
+    const resolved = await resolveSpec(id, adapterOptions);
+    // The one genuinely-absent case — no `spec.md` on disk — maps to 404. A malformed index
+    // still resolves (raw markdown plus a structured error) and passes through as 200.
+    if (resolved === null) return c.json({ error: "Not Found", path: c.req.path }, 404);
+    return c.json(resolved);
   });
 
   app.all("/api", (c) => c.json({ error: "Not Found", path: c.req.path }, 404));

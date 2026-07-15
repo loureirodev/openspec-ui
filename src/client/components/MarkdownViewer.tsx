@@ -8,6 +8,7 @@ import Markdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { remarkTaskProgress } from "../markdown/remark-task-progress.js";
+import { remarkRequirementAnchors } from "../markdown/requirement-anchors.js";
 
 /** The common-language subset OpenSpec content actually uses; see design.md Decision 1. */
 const HIGHLIGHT_LANGUAGES = {
@@ -95,6 +96,12 @@ const components: Components = {
 
 export interface MarkdownViewerProps {
   markdown: string;
+  /**
+   * Assigns slug `id`s to `### Requirement: …` headings, so a sidebar anchor built with the
+   * same slug function can navigate to it. Off by default so the changes and archived views
+   * render byte-for-byte as before — see design.md Decision 4 in the `specs-ui` change.
+   */
+  requirementAnchors?: boolean;
 }
 
 /**
@@ -102,11 +109,15 @@ export interface MarkdownViewerProps {
  * reading typography, and the task/scenario/spec-delta semantic layers. Renders a bare
  * fragment exactly as it would render inside a full document — see design.md Decision 4.
  */
-export function MarkdownViewer({ markdown }: MarkdownViewerProps) {
+export function MarkdownViewer({ markdown, requirementAnchors = false }: MarkdownViewerProps) {
+  const remarkPlugins = requirementAnchors
+    ? [remarkGfm, remarkTaskProgress, remarkRequirementAnchors]
+    : [remarkGfm, remarkTaskProgress];
+
   return (
     <div className="markdown-viewer">
       <Markdown
-        remarkPlugins={[remarkGfm, remarkTaskProgress]}
+        remarkPlugins={remarkPlugins}
         rehypePlugins={[[rehypeHighlight, { languages: HIGHLIGHT_LANGUAGES }]]}
         components={components}
       >

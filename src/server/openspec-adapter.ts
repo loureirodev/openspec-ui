@@ -347,3 +347,49 @@ export async function readSpec(id: string, options: AdapterOptions = {}): Promis
   const deps = resolveDeps(options);
   return runShowSpec(deps.run, id);
 }
+
+/**
+ * The hybrid detail {@link resolveSpec} resolves: the structured index when it parsed and
+ * validated, the raw `spec.md` markdown always, and a structured `error` when the index could
+ * not be resolved. `index` and `error` are mutually exclusive — a resolved spec never carries
+ * both, and a malformed one carries only `error`.
+ */
+export interface ResolvedSpec {
+  id: string;
+  index?: SpecDetail;
+  markdown: string;
+  error?: StructuredError;
+}
+
+/**
+ * Resolves one spec's hybrid detail: the raw `specs/<id>/spec.md` markdown, read through the
+ * scoped reader, combined with the structured index from `readSpec`. The two reads are
+ * independent — a file read and a binary spawn — so they run concurrently rather than back to
+ * back. The markdown is the body of record — see design.md Decision 3 — so its absence is the
+ * one case that signals a genuine 404 (returned here as `null`), independent of whether the
+ * index resolved; a JSON index that fails to parse or validate instead degrades to
+ * `{ id, markdown, error }`, `index` omitted, so the route can still serve `200` with a
+ * readable body.
+ */
+export async function resolveSpec(
+  id: string,
+  options: AdapterOptions = {},
+): Promise<ResolvedSpec | null> {
+  const deps = resolveDeps(options);
+  const specPath = join(deps.openspecRoot, "specs", id, "spec.md");
+
+  const [markdownResult, indexResult] = await Promise.allSettled([
+    deps.readScoped(specPath),
+    runShowSpec(deps.run, id),
+  ]);
+
+  if (markdownResult.status === "rejected") {
+    const error = markdownResult.reason;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
+  const markdown = markdownResult.value;
+
+  if (indexResult.status === "fulfilled") return { id, markdown, index: indexResult.value };
+  return { id, markdown, error: toStructuredError(indexResult.reason) };
+}

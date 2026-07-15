@@ -6,6 +6,7 @@ import {
   type AdapterOptions,
   listChanges,
   resolveChange,
+  resolveSpec,
   toStructuredError,
 } from "./openspec-adapter.js";
 import type { CommandResult, RunOpenSpec } from "./openspec-binary.js";
@@ -211,5 +212,72 @@ describe("resolveChange — integration against a fixture tree", () => {
     // Honest degradation: no fabricated status on archived artifacts.
     expect(resolved.artifacts.every((a) => a.status === undefined)).toBe(true);
     expect(resolved.progress).toEqual({ completed: 2, total: 3 });
+  });
+});
+
+describe("resolveSpec — hybrid detail against a fixture tree", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), "adapter-spec-"));
+    const specDir = join(root, "openspec", "specs", "core");
+    await mkdir(specDir, { recursive: true });
+    await writeFile(join(specDir, "spec.md"), "## Requirement: Core\n\nBody.", "utf8");
+  });
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it("resolves the raw markdown together with the structured index", async () => {
+    const detail = {
+      id: "core",
+      title: "Core",
+      requirementCount: 1,
+      requirements: [{ text: "Core", scenarios: [] }],
+    };
+    const resolved = await resolveSpec("core", {
+      projectRoot: root,
+      run: runFor({ show: { stdout: JSON.stringify(detail) } }),
+    });
+
+    expect(resolved).not.toBeNull();
+    expect(resolved?.markdown).toBe("## Requirement: Core\n\nBody.");
+    expect(resolved?.index).toEqual(detail);
+    expect(resolved?.error).toBeUndefined();
+  });
+
+  it("degrades to the raw markdown plus a structured error when the index fails validation", async () => {
+    const validationBody = JSON.stringify({
+      status: [{ severity: "error", message: "Spec 'core' is invalid." }],
+    });
+    const resolved = await resolveSpec("core", {
+      projectRoot: root,
+      run: runFor({ show: { stdout: validationBody } }),
+    });
+
+    expect(resolved).not.toBeNull();
+    expect(resolved?.markdown).toBe("## Requirement: Core\n\nBody.");
+    expect(resolved?.index).toBeUndefined();
+    expect(resolved?.error?.kind).toBe("validation");
+    expect(resolved?.error?.details).toEqual(["Spec 'core' is invalid."]);
+  });
+
+  it("resolves to null when the spec's markdown does not exist on disk", async () => {
+    const resolved = await resolveSpec("ghost", {
+      projectRoot: root,
+      run: runFor({}),
+    });
+
+    expect(resolved).toBeNull();
+  });
+
+  it("resolves to null on absent markdown even when the binary call also fails — the two reads run concurrently", async () => {
+    const resolved = await resolveSpec("ghost", {
+      projectRoot: root,
+      run: runFor({ show: { stdout: "not json" } }),
+    });
+
+    expect(resolved).toBeNull();
   });
 });

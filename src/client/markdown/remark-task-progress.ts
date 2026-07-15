@@ -1,6 +1,7 @@
 import type { Heading, List, ListItem, Root } from "mdast";
 import type { Plugin } from "unified";
 import { visit } from "unist-util-visit";
+import { headingText } from "./mdast-text.js";
 
 /** The completed and total checkbox counts for one `## N.` task section. */
 export interface TaskProgress {
@@ -9,14 +10,6 @@ export interface TaskProgress {
 }
 
 const TASK_SECTION = /^\d+\.\s/;
-
-function headingText(heading: Heading): string {
-  let text = "";
-  visit(heading, "text", (node) => {
-    text += node.value;
-  });
-  return text;
-}
 
 function countCheckboxes(nodes: Root["children"], from: number, to: number): TaskProgress {
   let done = 0;
