@@ -156,7 +156,7 @@
   border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
-.markdown-viewer h4.markdown-scenario+ul {
+.markdown-viewer h4.markdown-scenario + ul {
   margin-top: 0;
   padding: var(--space-sm) var(--space-lg) var(--space-lg) calc(var(--space-lg) + var(--space-lg));
   background-color: var(--panel);
