@@ -79,6 +79,97 @@ describe("resolveArtifactsFromBinary", () => {
     expect(artifacts[0]?.files[0]?.markdown).toBe("# proposal");
   });
 
+  it("labels colliding basenames by their distinguishing parent directory", async () => {
+    const status = {
+      changeName: "demo",
+      schemaName: "spec-driven",
+      artifacts: [{ id: "specs", outputPath: "specs/**/*.md", status: "in-progress" }],
+      artifactPaths: {
+        specs: {
+          existingOutputPaths: [
+            "/proj/openspec/changes/demo/specs/user-auth/spec.md",
+            "/proj/openspec/changes/demo/specs/data-export/spec.md",
+          ],
+        },
+      },
+    };
+    const deps: AdapterDeps = {
+      run: runFor({ status: { stdout: JSON.stringify(status) } }),
+      readScoped: readerFor({
+        "/proj/openspec/changes/demo/specs/user-auth/spec.md": "# a",
+        "/proj/openspec/changes/demo/specs/data-export/spec.md": "# b",
+      }),
+      projectRoot: PROJECT_ROOT,
+      openspecRoot: OPENSPEC_ROOT,
+    };
+
+    const { artifacts } = await resolveArtifactsFromBinary(deps, "demo");
+
+    expect(artifacts[0]?.files.map((f) => f.label)).toEqual(["user-auth", "data-export"]);
+  });
+
+  it("labels distinct basenames by the basename itself", async () => {
+    const status = {
+      changeName: "demo",
+      schemaName: "spec-with-remote",
+      artifacts: [{ id: "tasks", outputPath: "tasks/**/*.md", status: "in-progress" }],
+      artifactPaths: {
+        tasks: {
+          existingOutputPaths: [
+            "/proj/openspec/changes/demo/add-auth-task.md",
+            "/proj/openspec/changes/demo/add-db-task.md",
+          ],
+        },
+      },
+    };
+    const deps: AdapterDeps = {
+      run: runFor({ status: { stdout: JSON.stringify(status) } }),
+      readScoped: readerFor({
+        "/proj/openspec/changes/demo/add-auth-task.md": "# a",
+        "/proj/openspec/changes/demo/add-db-task.md": "# b",
+      }),
+      projectRoot: PROJECT_ROOT,
+      openspecRoot: OPENSPEC_ROOT,
+    };
+
+    const { artifacts } = await resolveArtifactsFromBinary(deps, "demo");
+
+    expect(artifacts[0]?.files.map((f) => f.label)).toEqual(["add-auth-task", "add-db-task"]);
+  });
+
+  it("escalates past a colliding parent directory to a deeper distinguishing segment", async () => {
+    // Both files share the basename `spec` AND the immediate parent name `core` — a single
+    // level of escalation is not enough to distinguish them, so the rule must keep going.
+    const status = {
+      changeName: "demo",
+      schemaName: "spec-driven",
+      artifacts: [{ id: "specs", outputPath: "specs/**/*.md", status: "in-progress" }],
+      artifactPaths: {
+        specs: {
+          existingOutputPaths: [
+            "/proj/openspec/changes/demo/specs/module-a/core/spec.md",
+            "/proj/openspec/changes/demo/specs/module-b/core/spec.md",
+          ],
+        },
+      },
+    };
+    const deps: AdapterDeps = {
+      run: runFor({ status: { stdout: JSON.stringify(status) } }),
+      readScoped: readerFor({
+        "/proj/openspec/changes/demo/specs/module-a/core/spec.md": "# a",
+        "/proj/openspec/changes/demo/specs/module-b/core/spec.md": "# b",
+      }),
+      projectRoot: PROJECT_ROOT,
+      openspecRoot: OPENSPEC_ROOT,
+    };
+
+    const { artifacts } = await resolveArtifactsFromBinary(deps, "demo");
+
+    const labels = artifacts[0]?.files.map((f) => f.label);
+    expect(labels).toEqual(["module-a/core", "module-b/core"]);
+    expect(new Set(labels)).toHaveProperty("size", 2);
+  });
+
   it("carries a blocked artifact's `missingDeps` and the status body's `nextSteps`", async () => {
     const status = {
       changeName: "demo",
@@ -193,6 +284,48 @@ describe("resolveArtifactsFromFilesystem", () => {
     const unattributed = artifacts.find((a) => a.id === UNATTRIBUTED_ARTIFACT_ID);
 
     expect(unattributed?.files.map((f) => f.markdown)).toEqual(["# stray"]);
+  });
+
+  it("labels a single-file artifact's file by its own basename", async () => {
+    const { artifacts } = await resolveArtifactsFromFilesystem(deps, changeDir);
+
+    expect(artifacts[0]?.files[0]?.label).toBe("proposal");
+  });
+
+  it("labels a colliding-basename artifact (spec.md across folders) by the parent folder,\
+ matching the binary source's derivation for the same file set", async () => {
+    await mkdir(join(changeDir, "specs", "another-cap"), { recursive: true });
+    await writeFile(join(changeDir, "specs", "another-cap", "spec.md"), "# another", "utf8");
+
+    const { artifacts } = await resolveArtifactsFromFilesystem(deps, changeDir);
+    const specsArtifact = artifacts.find((a) => a.id === "specs");
+
+    expect(specsArtifact?.files.map((f) => f.label).sort()).toEqual(["another-cap", "app-shell"]);
+
+    const status = {
+      changeName: "demo",
+      schemaName: "spec-driven",
+      artifacts: [{ id: "specs", outputPath: "specs/**/*.md", status: "in-progress" }],
+      artifactPaths: {
+        specs: {
+          existingOutputPaths: [
+            join(changeDir, "specs", "app-shell", "spec.md"),
+            join(changeDir, "specs", "another-cap", "spec.md"),
+          ],
+        },
+      },
+    };
+    const binaryDeps: AdapterDeps = {
+      run: runFor({ status: { stdout: JSON.stringify(status) } }),
+      readScoped: createScopedReader(join(root, "openspec")),
+      projectRoot: root,
+      openspecRoot: join(root, "openspec"),
+    };
+    const { artifacts: binaryArtifacts } = await resolveArtifactsFromBinary(binaryDeps, "demo");
+
+    expect(binaryArtifacts[0]?.files.map((f) => f.label).sort()).toEqual(
+      specsArtifact?.files.map((f) => f.label).sort(),
+    );
   });
 });
 

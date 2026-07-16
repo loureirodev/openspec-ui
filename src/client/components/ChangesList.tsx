@@ -41,27 +41,27 @@ function ChangeCard({
         className="changes-list__item-button"
         onClick={() => onSelect(item.name)}
       >
+        <div className="changes-list__row">
+          {item.status && (
+            <StatusBadge
+              status={item.status}
+              completed={item.completedTasks}
+              total={item.totalTasks}
+            />
+          )}
+          <code className="changes-list__name">{item.name}</code>
+          <span className="changes-list__progress-count">
+            {/* Not archived: the count comes from `list --json` verbatim, never recomputed here. */}
+            {!item.archived && "~"}
+            {item.completedTasks} / {item.totalTasks}
+          </span>
+          {item.lastModified && (
+            <span className="changes-list__last-modified">{formatDate(item.lastModified)}</span>
+          )}
+        </div>
+
+        {/* Demoted secondary line: the identity is the mono name above, not this duplicate. */}
         <span className="changes-list__title">{humanizeName(item.name)}</span>
-        <code className="changes-list__name">{item.name}</code>
-
-        {item.status && (
-          <StatusBadge
-            status={item.status}
-            completed={item.completedTasks}
-            total={item.totalTasks}
-          />
-        )}
-
-        <span className="changes-list__progress-count">
-          {/* Not archived: the count comes from `list --json` verbatim, never recomputed here. */}
-          {!item.archived && "~"}
-          {item.completedTasks} / {item.totalTasks}
-        </span>
-
-        {item.lastModified && (
-          <span className="changes-list__last-modified">{formatDate(item.lastModified)}</span>
-        )}
-
         {item.schema?.inferred && <span className="inferred-label">schema inferred</span>}
       </button>
     </li>
@@ -96,18 +96,23 @@ export function ChangesList({ changes, onSelect }: ChangesListProps) {
   return (
     <div className="changes-list">
       <div className="changes-list__controls">
-        <label>
-          Filter
+        <label className="changes-list__control">
+          <span className="changes-list__control-label">Filter</span>
           <input
             type="search"
+            className="form-input"
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
             placeholder="Filter by name…"
           />
         </label>
-        <label>
-          Sort by
-          <select value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)}>
+        <label className="changes-list__control">
+          <span className="changes-list__control-label">Sort by</span>
+          <select
+            className="form-select"
+            value={sortKey}
+            onChange={(event) => setSortKey(event.target.value as SortKey)}
+          >
             {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
               <option key={key} value={key}>
                 {SORT_LABELS[key]}

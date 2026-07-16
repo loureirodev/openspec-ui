@@ -33,6 +33,21 @@ describe("rendering a change", () => {
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
+  it("groups the mono name, status, count and date into one row, with the humanized title demoted below it", () => {
+    const { container } = render(<ChangesList changes={[item()]} onSelect={vi.fn()} />);
+
+    const row = container.querySelector(".changes-list__row");
+    expect(row).not.toBeNull();
+    expect(row?.querySelector(".changes-list__name")).not.toBeNull();
+    expect(row?.querySelector(".status-badge")).not.toBeNull();
+    expect(row?.querySelector(".changes-list__progress-count")).not.toBeNull();
+    expect(row?.querySelector(".changes-list__last-modified")).not.toBeNull();
+
+    // The humanized title is a sibling of the row, not inside it — a demoted secondary line.
+    const title = container.querySelector(".changes-list__title");
+    expect(row?.contains(title)).toBe(false);
+  });
+
   it("selects a change when its card is activated", async () => {
     const onSelect = vi.fn();
     render(<ChangesList changes={[item({ name: "add-foo" })]} onSelect={onSelect} />);

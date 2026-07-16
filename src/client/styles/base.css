@@ -72,3 +72,89 @@ code {
   color: var(--muted);
   font-style: italic;
 }
+
+/* Form-control vocabulary — see design.md: text/search input, select and button all resolve
+   colour, border, radius and typography from tokens rather than native rendering, and stay
+   legible in both themes since every value here is a token. */
+
+.form-input,
+.form-select {
+  font: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  background-color: var(--bg);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) var(--space-sm);
+}
+
+.form-input:focus-visible,
+.form-select:focus-visible,
+.form-button:focus-visible,
+.icon-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.form-button {
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text);
+  background-color: var(--panel);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) var(--space-md);
+  cursor: pointer;
+}
+
+.form-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.form-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Icon-only button: an accessible name comes from `aria-label` (the glyph alone never carries
+   one), and a control driving an in-flight operation spins its glyph while `aria-busy` and is
+   disabled until it settles — see design.md's icon-button rule. */
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-button:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.icon-button__glyph {
+  display: block;
+}
+
+.icon-button[aria-busy="true"] .icon-button__glyph {
+  animation: icon-button-spin 0.8s linear infinite;
+}
+
+@keyframes icon-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

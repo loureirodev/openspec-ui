@@ -3,6 +3,7 @@
 .markdown-viewer {
   max-width: 680px;
   line-height: var(--line-height-relaxed);
+  margin: 0 auto;
 }
 
 .markdown-viewer > :first-child {
@@ -21,16 +22,19 @@
 }
 
 .markdown-viewer h1 {
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-3xl);
 }
 
 .markdown-viewer h2 {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-2xl);
 }
 
-.markdown-viewer h3,
+.markdown-viewer h3 {
+  font-size: var(--font-size-xl);
+}
+
 .markdown-viewer h4 {
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-lg);
 }
 
 .markdown-viewer p,
@@ -84,10 +88,15 @@
 
 .markdown-viewer .task-list-item {
   list-style: none;
+  position: relative;
 }
 
 .markdown-viewer .task-list-item input[type="checkbox"] {
   margin-right: var(--space-xs);
+  position: absolute;
+  top: 4px;
+  left: -2em;
+  pointer-events: none;
 }
 
 /* Markdown viewer: per-section task progress */
@@ -147,7 +156,7 @@
   border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
-.markdown-viewer h4.markdown-scenario + ul {
+.markdown-viewer h4.markdown-scenario+ul {
   margin-top: 0;
   padding: var(--space-sm) var(--space-lg) var(--space-lg) calc(var(--space-lg) + var(--space-lg));
   background-color: var(--panel);

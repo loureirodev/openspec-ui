@@ -20,7 +20,7 @@ function ChangeDetailView({ name, onBack }: { name: string; onBack: () => void }
       <section aria-labelledby="page-title">
         <h1 id="page-title">Could not load “{name}”</h1>
         <p>{error?.message}</p>
-        <button type="button" onClick={onBack}>
+        <button type="button" className="form-button" onClick={onBack}>
           Back to changes
         </button>
       </section>
@@ -29,7 +29,7 @@ function ChangeDetailView({ name, onBack }: { name: string; onBack: () => void }
 
   return (
     <>
-      <button type="button" className="change-detail__back" onClick={onBack}>
+      <button type="button" className="form-button change-detail__back" onClick={onBack}>
         Back to changes
       </button>
       <ChangeDetail change={data} />
@@ -46,7 +46,7 @@ export function ChangesPage() {
   }
 
   return (
-    <section aria-labelledby="page-title">
+    <section aria-labelledby="page-title" className="view-width--text">
       <h1 id="page-title">Changes</h1>
 
       {isPending && (

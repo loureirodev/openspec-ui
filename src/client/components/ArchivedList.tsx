@@ -21,11 +21,15 @@ export function ArchivedList({ changes, onSelect }: ArchivedListProps) {
             className="archived-list__item-button"
             onClick={() => onSelect(item.name)}
           >
+            <div className="archived-list__row">
+              <code className="archived-list__name">{item.name}</code>
+              {item.archivedDate && (
+                <span className="archived-list__date">Archived {item.archivedDate}</span>
+              )}
+            </div>
+
+            {/* Demoted secondary line: the identity is the mono name above, not this duplicate. */}
             <span className="archived-list__title">{humanizeName(item.name)}</span>
-            <code className="archived-list__name">{item.name}</code>
-            {item.archivedDate && (
-              <span className="archived-list__date">Archived {item.archivedDate}</span>
-            )}
           </button>
         </li>
       ))}

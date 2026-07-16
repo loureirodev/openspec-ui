@@ -1,4 +1,4 @@
-import { join, relative, sep } from "node:path";
+import { join, parse, relative, sep } from "node:path";
 import { collectMarkdown } from "./fs-walk.js";
 import type { RunOpenSpec } from "./openspec-binary.js";
 import { runStatus } from "./openspec-data.js";
@@ -28,6 +28,12 @@ export interface ArtifactFile {
   path: string;
   /** Path relative to the project root, for display. */
   relPath: string;
+  /**
+   * Short display label derived from the artifact's file set — see design.md's
+   * distinguishing-segment rule: the file's own basename (without extension) when that's
+   * unique among its siblings, else the distinguishing parent directory name.
+   */
+  label: string;
   /** The file's markdown contents. */
   markdown: string;
 }
@@ -74,13 +80,65 @@ export interface ChangeRef {
   changeDir: string;
 }
 
-/** Reads one file into the uniform {@link ArtifactFile} shape through the scoped reader. */
-async function toArtifactFile(deps: AdapterDeps, path: string): Promise<ArtifactFile> {
+/** An {@link ArtifactFile} before its `label` is derived from its artifact's sibling files. */
+type UnlabeledFile = Omit<ArtifactFile, "label">;
+
+/** Reads one file into the uniform shape through the scoped reader, `label` still pending. */
+async function toArtifactFile(deps: AdapterDeps, path: string): Promise<UnlabeledFile> {
   return {
     path,
     relPath: relative(deps.projectRoot, path),
     markdown: await deps.readScoped(path),
   };
+}
+
+/** Counts how many times each label occurs, to find which ones still collide. */
+function collidingLabels(labels: string[]): Set<string> {
+  const counts = new Map<string, number>();
+  for (const label of labels) counts.set(label, (counts.get(label) ?? 0) + 1);
+  const colliding = new Set<string>();
+  for (const [label, count] of counts) if (count > 1) colliding.add(label);
+  return colliding;
+}
+
+/**
+ * The distinguishing-segment rule (see design.md): within one artifact's file set, a file's
+ * label is its own basename (without extension) when that's unique among its siblings; when
+ * basenames collide, the label escalates to the immediate parent directory name, and — only if
+ * that *still* collides (e.g. two capabilities each nesting a same-named sub-spec folder) —
+ * keeps escalating one directory level at a time until it distinguishes the file, joining the
+ * escalated segments (never reintroducing the basename). Computed once, over the whole set, so
+ * every file's uniqueness is judged against the same siblings — schema-agnostic, no artifact-
+ * or filename-specific logic. Termination is guaranteed because two files never share the same
+ * `relPath`, so the full path (the last thing tried) is always unique.
+ */
+function withLabels(files: UnlabeledFile[]): ArtifactFile[] {
+  const parsed = files.map((file) => parse(file.relPath));
+  // Directory segments closest-to-farthest (index 0 = immediate parent), consumed one at a
+  // time to escalate a colliding label — see the doc comment above.
+  const dirSegments = parsed.map((p) => p.dir.split(sep).filter(Boolean).reverse());
+
+  let labels = parsed.map((p) => p.name);
+  let depth = 0;
+  let colliding = collidingLabels(labels);
+  while (colliding.size > 0) {
+    let escalatedAny = false;
+    labels = labels.map((label, index) => {
+      if (!colliding.has(label)) return label;
+      const segs = dirSegments[index] ?? [];
+      if (depth >= segs.length) return label; // ran out of directory context — leave as-is
+      escalatedAny = true;
+      return segs
+        .slice(0, depth + 1)
+        .reverse()
+        .join("/");
+    });
+    if (!escalatedAny) break; // every still-colliding file has no more context to add
+    depth++;
+    colliding = collidingLabels(labels);
+  }
+
+  return files.map((file, index) => ({ ...file, label: labels[index] ?? "" }));
 }
 
 /**
@@ -101,7 +159,7 @@ export async function resolveArtifactsFromBinary(
   // resolve to no artifacts rather than throwing a `not iterable` TypeError to the caller.
   for (const artifact of status.artifacts ?? []) {
     const existing = artifactPaths[artifact.id]?.existingOutputPaths ?? [];
-    const files = await Promise.all(existing.map((path) => toArtifactFile(deps, path)));
+    const files = withLabels(await Promise.all(existing.map((path) => toArtifactFile(deps, path))));
     artifacts.push({
       id: artifact.id,
       status: artifact.status,
@@ -158,13 +216,15 @@ export async function resolveArtifactsFromFilesystem(
     // `status` and `missingDeps` are intentionally omitted: neither was persisted for an
     // archived change.
     const paths = markdownForArtifactId(changeDir, id, allMarkdown, consumed);
-    const files = await Promise.all(paths.map((path) => toArtifactFile(deps, path)));
+    const files = withLabels(await Promise.all(paths.map((path) => toArtifactFile(deps, path))));
     artifacts.push({ id, files });
   }
 
   const leftovers = allMarkdown.filter((path) => !consumed.has(path));
   if (leftovers.length > 0) {
-    const files = await Promise.all(leftovers.map((path) => toArtifactFile(deps, path)));
+    const files = withLabels(
+      await Promise.all(leftovers.map((path) => toArtifactFile(deps, path))),
+    );
     artifacts.push({ id: UNATTRIBUTED_ARTIFACT_ID, files });
   }
   // No `nextSteps`: those come only from a binary `status` call, never attempted here.

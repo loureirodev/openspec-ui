@@ -38,9 +38,22 @@
   margin-left: auto;
 }
 
+/* `.app__main` is the shell's own default width, not a per-page override: 1120px is what a
+   sidebar/second-column view (change detail, specs) needs, and it doubles as a safe bound for
+   any state that renders directly under it without opting into a narrower width (a loading
+   line, an error card, the health diagnostics, a 404) — so no render path can regress to
+   unbounded full-bleed just because its author didn't remember a width class. See design.md's
+   "width is a property of the view, not a global shell". */
 .app__main {
   max-width: 1120px;
   margin: 0 auto;
   padding: 1.5rem;
   box-sizing: border-box;
+}
+
+/* The one opt-in narrowing utility: list-style pages (changes, archived, not-found) read at
+   text width, centred within the shell, instead of hugging the left edge of the wider default. */
+.view-width--text {
+  max-width: 820px;
+  margin: 0 auto;
 }

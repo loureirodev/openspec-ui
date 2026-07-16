@@ -109,14 +109,15 @@ function ArtifactBody({ artifact }: { artifact: ResolvedArtifact }) {
                   : "change-detail__file-tab"
               }
               onClick={() => setFileIndex(index)}
+              title={candidate.relPath}
             >
-              {candidate.relPath}
+              <span className="change-detail__file-tab-label">{candidate.label}</span>
             </button>
           ))}
         </div>
       )}
       {file && (
-        <div role="tabpanel">
+        <div className="change-detail__file-panel" role="tabpanel">
           <MarkdownViewer markdown={file.markdown} />
         </div>
       )}

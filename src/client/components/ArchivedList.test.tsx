@@ -16,6 +16,23 @@ describe("the archived list", () => {
     expect(screen.getByText(/2026-07-01/)).toBeInTheDocument();
   });
 
+  it("groups the mono name and archived date into one row, with the humanized title demoted below it", () => {
+    const { container } = render(
+      <ArchivedList
+        changes={[{ name: "old-feature", archivedDate: "2026-07-01" }]}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    const row = container.querySelector(".archived-list__row");
+    expect(row).not.toBeNull();
+    expect(row?.querySelector(".archived-list__name")).not.toBeNull();
+    expect(row?.querySelector(".archived-list__date")).not.toBeNull();
+
+    const title = container.querySelector(".archived-list__title");
+    expect(row?.contains(title)).toBe(false);
+  });
+
   it("renders an empty state rather than an error when there are none", () => {
     render(<ArchivedList changes={[]} onSelect={vi.fn()} />);
 

@@ -44,13 +44,20 @@ describe("the archived browser", () => {
             artifacts: [
               {
                 id: "proposal",
-                files: [{ path: "/p", relPath: "proposal.md", markdown: "# proposal" }],
+                files: [
+                  { path: "/p", relPath: "proposal.md", label: "proposal", markdown: "# proposal" },
+                ],
               },
               {
                 id: "specs",
                 historical: true,
                 files: [
-                  { path: "/s", relPath: "specs/core/spec.md", markdown: "# ADDED Requirements" },
+                  {
+                    path: "/s",
+                    relPath: "specs/core/spec.md",
+                    label: "core",
+                    markdown: "# ADDED Requirements",
+                  },
                 ],
               },
             ],

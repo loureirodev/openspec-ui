@@ -83,9 +83,18 @@ follow the same "coloured text, not a tinted pill" rule.
 
 ## Layout and stylesheet conventions
 
-- **Reading widths.** A markdown reading column (`.markdown-viewer`) caps at `680px`; the
-  changes list caps at `820px`; the outer app container (`.app__main`) caps at `1120px` and is
-  centred — wide enough to hold a sidebar layout (the specs browser) comfortably.
+- **Width is a property of the view, layered over a safe shell default.** `.app__main`
+  (`src/client/styles/app.css`) itself caps at `1120px`, centred with `margin: 0 auto` — this is
+  what a sidebar/second-column view (change/archived detail, the specs browser) needs, and it
+  doubles as the default bound for any render path that doesn't opt into something narrower (a
+  loading line, an error card, the health diagnostics, the 404 page): nothing can regress to
+  unbounded full-bleed just because one branch forgot a width class. List-style pages
+  (`ChangesPage`, `ArchivedPage`, `NotFoundPage`) that read like a document opt into the one
+  named narrowing utility, `.view-width--text` (`820px`, also centred), instead of hugging the
+  left edge of the wider default.
+
+  Within a wide view, a markdown reading column (`.markdown-viewer`) still caps at `680px`, so
+  prose never stretches to the full 1120px even where the page around it is wide.
 - **Hairlines over cards.** List rows and sidebar items are separated by a `1px solid --hair`
   rule (typically `border-bottom`), not a full bordered box. `--panel` is reserved for exactly
   one surface: the scenario block in rendered markdown. Alert/error callouts (a failed change
@@ -99,11 +108,12 @@ follow the same "coloured text, not a tinted pill" rule.
   - `tokens.css` — the `:root` (+ dark-mode) token layer: colour roles, font-family roles,
     spacing/radius primitives.
   - `base.css` — reset, base typography wiring, and shared building blocks used across pages
-    (status badges, the inferred-schema label, heading font rules).
+    (status badges, the inferred-schema label, heading font rules, the form-control and
+    icon-button vocabulary below).
   - `markdown.css` — `MarkdownViewer` output: reading typography, task/scenario/delta
     semantics, and the `highlight.js` theme. Global by necessity, since `react-markdown` emits
     plain HTML this can't scope to a module.
-  - `app.css` — the top bar: brand, nav, refresh control, main container.
+  - `app.css` — the top bar (brand, nav, refresh control) and the per-view width utilities.
   - `changes.css` — the changes list, change detail, and archived list.
   - `specs.css` — the specs browser: sidebar and spec detail.
 
@@ -111,6 +121,36 @@ follow the same "coloured text, not a tinted pill" rule.
   *new* component ships its own co-located `Component.module.css` (Vite-native CSS Modules —
   no new dependency); don't add further global selectors to the files above except to extend
   an existing domain.
+
+## Form controls and icon buttons
+
+`src/client/styles/base.css` defines a small, named vocabulary for the interactive controls
+the dashboard uses, so a filter input, a sort `<select>`, or an action button never falls back
+to unstyled native rendering. Every rule resolves colour, border, radius and typography from
+tokens, so all of it holds up unchanged in dark theme.
+
+| class | for | notes |
+|---|---|---|
+| `.form-input` | text/search inputs | `--text` on `--bg`, `--hair` border, `--radius-sm` |
+| `.form-select` | `<select>` | same treatment as `.form-input` |
+| `.form-button` | a labelled action button | `--panel` background, `--hair` border; hover moves the border and text to `--accent` |
+| `.icon-button` | an icon-only button (e.g. `RefreshControl`) | square, `--hair` border, `--muted` glyph colour; hover moves to `--accent` |
+
+All four share one focus rule (`:focus-visible` → a 2px `--accent` outline) and one disabled
+rule (`opacity: 0.6`, `cursor: not-allowed`).
+
+**Icon buttons need an accessible name and a busy affordance.** An icon-only control's glyph
+never doubles as its accessible name — `aria-label` names the action explicitly (and may
+change with state, e.g. `"Refresh"` → `"Refreshing…"`). A control that kicks off an in-flight
+background operation:
+
+- sets `aria-busy="true"` for the duration, which `.icon-button[aria-busy="true"] .icon-button__glyph`
+  turns into a spin animation (`@keyframes icon-button-spin`, plain CSS, no new dependency);
+- is `disabled` until the operation settles, so a second click can't queue a second request.
+
+`RefreshControl` is the reference implementation: it wraps an inline-SVG glyph in
+`.icon-button__glyph`, and its existing `useIsFetching` wiring drives both `aria-busy` and
+`disabled` — no separate state was needed.
 
 ## Non-goals (for now)
 

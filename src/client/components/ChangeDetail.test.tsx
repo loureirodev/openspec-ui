@@ -14,12 +14,12 @@ function change(overrides: Partial<ResolvedChange> = {}): ResolvedChange {
       {
         id: "proposal",
         status: "done",
-        files: [{ path: "/p", relPath: "proposal.md", markdown: "# proposal" }],
+        files: [{ path: "/p", relPath: "proposal.md", label: "proposal", markdown: "# proposal" }],
       },
       {
         id: "tasks",
         status: "in-progress",
-        files: [{ path: "/t", relPath: "tasks.md", markdown: "- [x] a\n- [ ] b" }],
+        files: [{ path: "/t", relPath: "tasks.md", label: "tasks", markdown: "- [x] a\n- [ ] b" }],
       },
     ],
     ...overrides,
@@ -90,7 +90,7 @@ describe("two-level artifact tabs", () => {
     expect(screen.getByRole("heading", { level: 1, name: "proposal" })).toBeInTheDocument();
   });
 
-  it("shows Level-2 file tabs, labelled by relative path, for a multi-file artifact", async () => {
+  it("shows Level-2 file tabs, labelled by the derived short label, for a multi-file artifact", async () => {
     render(
       <ChangeDetail
         change={change({
@@ -98,8 +98,8 @@ describe("two-level artifact tabs", () => {
             {
               id: "specs",
               files: [
-                { path: "/a", relPath: "specs/a/spec.md", markdown: "# a spec" },
-                { path: "/b", relPath: "specs/b/spec.md", markdown: "# b spec" },
+                { path: "/a", relPath: "specs/a/spec.md", label: "a", markdown: "# a spec" },
+                { path: "/b", relPath: "specs/b/spec.md", label: "b", markdown: "# b spec" },
               ],
             },
           ],
@@ -107,11 +107,44 @@ describe("two-level artifact tabs", () => {
       />,
     );
 
-    expect(screen.getByRole("tab", { name: "specs/a/spec.md" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "specs/b/spec.md" })).toBeInTheDocument();
+    const tabA = screen.getByRole("tab", { name: "a" });
+    const tabB = screen.getByRole("tab", { name: "b" });
+    expect(tabA).toBeInTheDocument();
+    expect(tabB).toBeInTheDocument();
+    // The full relative path stays available on hover via `title`, not in the label text.
+    expect(tabA).toHaveAttribute("title", "specs/a/spec.md");
+    expect(tabB).toHaveAttribute("title", "specs/b/spec.md");
 
-    await userEvent.click(screen.getByRole("tab", { name: "specs/b/spec.md" }));
+    await userEvent.click(tabB);
     expect(screen.getByText("b spec")).toBeInTheDocument();
+  });
+
+  it("keeps the file-tab column width-bounded even for a very long relative path", () => {
+    render(
+      <ChangeDetail
+        change={change({
+          artifacts: [
+            {
+              id: "specs",
+              files: [
+                {
+                  path: "/a",
+                  relPath:
+                    "specs/an-extremely-long-capability-name-that-would-otherwise-displace-the-layout/spec.md",
+                  label:
+                    "an-extremely-long-capability-name-that-would-otherwise-displace-the-layout",
+                  markdown: "# a spec",
+                },
+                { path: "/b", relPath: "specs/b/spec.md", label: "b", markdown: "# b spec" },
+              ],
+            },
+          ],
+        })}
+      />,
+    );
+
+    const tabs = screen.getByRole("tablist", { name: "Files" });
+    expect(tabs).toHaveClass("change-detail__file-tabs");
   });
 
   it("renders one tab per artifact from a custom schema with no code change", () => {
@@ -123,7 +156,7 @@ describe("two-level artifact tabs", () => {
             {
               id: "rfc",
               status: "done",
-              files: [{ path: "/r", relPath: "rfc.md", markdown: "# rfc" }],
+              files: [{ path: "/r", relPath: "rfc.md", label: "rfc", markdown: "# rfc" }],
             },
           ],
         })}
@@ -144,7 +177,12 @@ describe("historical framing of spec deltas", () => {
               id: "specs",
               historical: true,
               files: [
-                { path: "/s", relPath: "specs/core/spec.md", markdown: "# ADDED Requirements" },
+                {
+                  path: "/s",
+                  relPath: "specs/core/spec.md",
+                  label: "core",
+                  markdown: "# ADDED Requirements",
+                },
               ],
             },
           ],

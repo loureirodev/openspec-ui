@@ -20,7 +20,7 @@ function ArchivedDetailView({ id, onBack }: { id: string; onBack: () => void }) 
       <section aria-labelledby="page-title">
         <h1 id="page-title">Could not load “{id}”</h1>
         <p>{error?.message}</p>
-        <button type="button" onClick={onBack}>
+        <button type="button" className="form-button" onClick={onBack}>
           Back to archived
         </button>
       </section>
@@ -29,7 +29,7 @@ function ArchivedDetailView({ id, onBack }: { id: string; onBack: () => void }) 
 
   return (
     <>
-      <button type="button" className="change-detail__back" onClick={onBack}>
+      <button type="button" className="form-button change-detail__back" onClick={onBack}>
         Back to archived
       </button>
       <ChangeDetail change={data} historical />
@@ -46,7 +46,7 @@ export function ArchivedPage() {
   }
 
   return (
-    <section aria-labelledby="page-title">
+    <section aria-labelledby="page-title" className="view-width--text">
       <h1 id="page-title">Archived</h1>
 
       {isPending && (
