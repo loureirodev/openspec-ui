@@ -1,0 +1,190 @@
+/* Changes list */
+
+.changes-list {
+  max-width: 820px;
+}
+
+.changes-list__controls {
+  display: flex;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-md);
+}
+
+.changes-list__items,
+.archived-list__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 820px;
+}
+
+/* Hairline row separators rather than full-border cards — see design.md's reading-first
+   chrome. Each row carries its own bottom rule; the list border-collapses them into a
+   single ruled column. */
+.changes-list__item-button,
+.archived-list__item-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-md) 0;
+  border: none;
+  border-bottom: 1px solid var(--hair);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.changes-list__item--failed {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  color: var(--danger);
+}
+
+.changes-list__failed-title {
+  font-weight: 600;
+  margin: 0;
+}
+
+.changes-list__failed-message {
+  margin: var(--space-xs) 0 0;
+}
+
+.changes-list__name,
+.archived-list__name {
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+.changes-list__progress-count {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}
+
+/* Change detail */
+
+.change-detail__back {
+  margin-bottom: var(--space-md);
+}
+
+.change-detail__name {
+  color: var(--muted);
+}
+
+.change-detail__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0 var(--space-md);
+}
+
+.change-detail__progress-bar {
+  width: 280px;
+  max-width: 100%;
+  accent-color: var(--accent);
+}
+
+.change-detail__progress-count {
+  font-family: var(--font-mono);
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+.change-detail__artifact-id {
+  font-family: var(--font-mono);
+}
+
+.change-detail__artifact-states {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.change-detail__artifact-states li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.change-detail__missing-deps {
+  color: var(--danger);
+  font-size: var(--font-size-sm);
+}
+
+.change-detail__tabs {
+  display: flex;
+  gap: var(--space-xs);
+  border-bottom: 1px solid var(--hair);
+  margin: var(--space-lg) 0 var(--space-md);
+}
+
+.change-detail__tab {
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.change-detail__tab--active {
+  font-weight: 600;
+  border-bottom: 2px solid var(--accent);
+}
+
+.change-detail__tab--disabled {
+  color: var(--muted);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.change-detail__file-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  float: left;
+  margin-right: var(--space-lg);
+}
+
+.change-detail__file-tab {
+  text-align: left;
+  padding: var(--space-xs) var(--space-sm);
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.change-detail__file-tab--active {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.change-detail__historical-body {
+  opacity: 0.75;
+}
+
+.change-detail__historical-body summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-style: italic;
+  margin-bottom: var(--space-sm);
+}
+
+.archived-list__date {
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}

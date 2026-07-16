@@ -18,14 +18,19 @@ function item(overrides: Partial<ChangeListItem> = {}): ChangeListItem {
 }
 
 describe("rendering a change", () => {
-  it("shows the name and title, a progress bar, a status badge, and last-modified", () => {
+  it("shows the name and title, a fractional status icon, coloured status text, the count, and last-modified", () => {
     render(<ChangesList changes={[item()]} onSelect={vi.fn()} />);
 
     expect(screen.getByText("add-foo")).toBeInTheDocument();
     expect(screen.getByText("Add Foo")).toBeInTheDocument();
     expect(screen.getByText("in-progress")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    // The icon is decorative (the adjacent text already conveys the status), so it's an
+    // `svg[data-status]`, not an accessible `img` — asserting on the attribute instead.
+    expect(document.querySelector('svg[data-status="in-progress"]')).toBeInTheDocument();
+    expect(screen.getByText(/1 \/ 2/)).toBeInTheDocument();
     expect(screen.getByText(/2026/)).toBeInTheDocument();
+    // The icon is the list's sole progress indicator — no separate bar renders alongside it.
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
   it("selects a change when its card is activated", async () => {

@@ -47,9 +47,16 @@ function HeaderCard({ change, historical }: { change: ResolvedChange; historical
         {change.schema.inferred && <span className="inferred-label"> (schema inferred)</span>}
       </p>
 
-      <p className="change-detail__progress">
-        {change.progress.completed} / {change.progress.total} tasks
-      </p>
+      <div className="change-detail__progress">
+        <progress
+          className="change-detail__progress-bar"
+          value={change.progress.completed}
+          max={Math.max(change.progress.total, 1)}
+        />
+        <span className="change-detail__progress-count">
+          {change.progress.completed} / {change.progress.total} tasks
+        </span>
+      </div>
 
       <ul className="change-detail__artifact-states">
         {change.artifacts.map((artifact) => (

@@ -1,0 +1,70 @@
+:root {
+  /* Colour roles — warm "paper + ink" palette, see design.md */
+  --bg: oklch(96.5% 0.014 85);
+  --panel: oklch(94% 0.016 85);
+  --track: oklch(88% 0.018 85);
+  --hair: oklch(90% 0.016 82);
+  --text: oklch(26% 0.02 70);
+  --muted: oklch(48% 0.02 72);
+  --faint: oklch(62% 0.018 75);
+
+  /* The accent is the only cold hue (ink navy) — distinct from --danger so
+     "interactive" is never confused with "error". See design.md Decision 1. */
+  --accent: oklch(42% 0.11 255);
+  --accent-tint: oklch(92% 0.03 255);
+
+  --success: oklch(52% 0.14 150);
+  --warning: oklch(56% 0.13 85);
+  --danger: oklch(53% 0.19 25);
+
+  /* Renamed-delta / secondary syntax accent — a violet distinct from accent and danger. */
+  --renamed: oklch(50% 0.16 300);
+
+  /* Typographic font roles */
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "Lexend", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.5rem;
+  --line-height-base: 1.5;
+  --line-height-relaxed: 1.7;
+
+  /* Spacing and radius primitives */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  font-family: var(--font-body);
+  line-height: var(--line-height-base);
+  color: var(--text);
+  background-color: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: oklch(20% 0.012 80);
+    --panel: oklch(24% 0.012 80);
+    --track: oklch(30% 0.012 80);
+    --hair: oklch(28% 0.012 80);
+    --text: oklch(94% 0.008 80);
+    --muted: oklch(72% 0.011 80);
+    --faint: oklch(56% 0.012 80);
+
+    --accent: oklch(72% 0.1 255);
+    --accent-tint: oklch(32% 0.06 255);
+
+    --success: oklch(76% 0.14 150);
+    --warning: oklch(80% 0.13 85);
+    --danger: oklch(72% 0.16 25);
+
+    --renamed: oklch(74% 0.14 300);
+  }
+}

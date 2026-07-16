@@ -1,0 +1,74 @@
+body {
+  margin: 0;
+  font-family: var(--font-body);
+}
+
+/* Page and section headings use the display role; large display gets a touch tighter
+   letter-spacing since Lexend/Fraunces run a little wider than the previous system stack. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+h1 {
+  letter-spacing: -0.01em;
+}
+
+/* Technical text — names, paths, and code — resolves the mono role everywhere by default. */
+code {
+  font-family: var(--font-mono);
+}
+
+.diagnostics__details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0;
+}
+
+.diagnostics__details dt {
+  font-weight: 600;
+}
+
+.diagnostics__details dd {
+  margin: 0;
+}
+
+/* Status badges: an icon + coloured text, no filled pill (see design.md status vocabulary) */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status-badge--success {
+  color: var(--success);
+}
+
+.status-badge--info {
+  color: var(--accent);
+}
+
+.status-badge--danger {
+  color: var(--danger);
+}
+
+.status-badge--neutral,
+.status-badge--closed {
+  color: var(--muted);
+}
+
+.inferred-label {
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+  font-style: italic;
+}

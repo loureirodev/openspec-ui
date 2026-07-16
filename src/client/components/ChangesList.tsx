@@ -44,19 +44,18 @@ function ChangeCard({
         <span className="changes-list__title">{humanizeName(item.name)}</span>
         <code className="changes-list__name">{item.name}</code>
 
-        {item.status && <StatusBadge status={item.status} />}
-
-        <span className="changes-list__progress">
-          <progress
-            className="changes-list__progress-bar"
-            value={item.completedTasks}
-            max={Math.max(item.totalTasks, 1)}
+        {item.status && (
+          <StatusBadge
+            status={item.status}
+            completed={item.completedTasks}
+            total={item.totalTasks}
           />
-          <span className="changes-list__progress-count">
-            {/* Not archived: the count comes from `list --json` verbatim, never recomputed here. */}
-            {!item.archived && "~"}
-            {item.completedTasks} / {item.totalTasks}
-          </span>
+        )}
+
+        <span className="changes-list__progress-count">
+          {/* Not archived: the count comes from `list --json` verbatim, never recomputed here. */}
+          {!item.archived && "~"}
+          {item.completedTasks} / {item.totalTasks}
         </span>
 
         {item.lastModified && (
