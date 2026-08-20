@@ -146,6 +146,8 @@ const SCHEMAS_STDOUT = JSON.stringify([
 
 describe("the changes and archived API routes", () => {
   let root: string;
+  /** A directory outside the project root, so a symlink into it genuinely escapes. */
+  let outsideRoot: string;
 
   function appFor(run: RunOpenSpec) {
     return createApp({ clientDir, adapterOptions: { projectRoot: root, run } });
@@ -170,17 +172,21 @@ describe("the changes and archived API routes", () => {
     await writeFile(join(archiveDir, "tasks.md"), "- [x] one\n- [ ] two\n", "utf8");
     await writeFile(join(archiveDir, "specs", "core", "spec.md"), "# core spec", "utf8");
 
-    // A second archived change whose `tasks.md` escapes the tree via symlink: reading it must
-    // fail *this* change only, and it must still appear in the list as an error entry.
+    // A second archived change whose `tasks.md` escapes the *project root* via symlink:
+    // reading it must fail *this* change only, and it must still appear in the list as an
+    // error entry. The target is outside `root`, since the boundary is now the project root
+    // and a link that merely leaves `openspec/` resolves to a readable project file.
     const corruptDir = join(openspecRoot, "changes", "archive", "2026-07-02-corrupt");
     await mkdir(corruptDir, { recursive: true });
     await writeFile(join(corruptDir, ".openspec.yaml"), "schema: spec-driven\n", "utf8");
-    await writeFile(join(root, "outside.md"), "- [x] leaked", "utf8");
-    await symlink(join(root, "outside.md"), join(corruptDir, "tasks.md"));
+    outsideRoot = await mkdtemp(join(tmpdir(), "app-outside-"));
+    await writeFile(join(outsideRoot, "outside.md"), "- [x] leaked", "utf8");
+    await symlink(join(outsideRoot, "outside.md"), join(corruptDir, "tasks.md"));
   });
 
   afterEach(async () => {
     await rm(root, { recursive: true, force: true });
+    await rm(outsideRoot, { recursive: true, force: true });
   });
 
   describe("GET /api/changes", () => {
@@ -281,6 +287,101 @@ describe("the changes and archived API routes", () => {
       expect(body.artifacts[0]?.files[0]?.markdown).toBe("# proposal");
       expect(body.progress).toEqual({ completed: 1, total: 2 });
       expect(body.nextSteps).toEqual(["Finish the tasks."]);
+    });
+
+    it("returns 200 with the out-of-tree artifact's markdown", async () => {
+      // The reported bug: a schema with `generates: "../../../adr/*.md"` puts an artifact
+      // outside `openspec/`. This used to fail the whole request with a 500.
+      await mkdir(join(root, "adr"), { recursive: true });
+      await writeFile(join(root, "adr", "0001-use-postgres.md"), "# adr", "utf8");
+      const status = {
+        changeName: "active-one",
+        schemaName: "spec-driven",
+        artifacts: [
+          { id: "proposal", outputPath: "proposal.md", status: "done" },
+          { id: "adr", outputPath: "../../../adr/*.md", status: "done" },
+        ],
+        artifactPaths: {
+          proposal: {
+            existingOutputPaths: [join(root, "openspec/changes/active-one/proposal.md")],
+          },
+          adr: { existingOutputPaths: [join(root, "adr", "0001-use-postgres.md")] },
+        },
+      };
+      const app = appFor(
+        runFor({ status: { stdout: JSON.stringify(status) }, schemas: { stdout: SCHEMAS_STDOUT } }),
+      );
+
+      const response = await app.request("/api/changes/active-one");
+      expect(response.status).toBe(200);
+
+      const body = (await response.json()) as {
+        artifacts: Array<{ id: string; files: Array<{ markdown: string; relPath: string }> }>;
+      };
+      const adr = body.artifacts.find((a) => a.id === "adr");
+      expect(adr?.files[0]?.markdown).toBe("# adr");
+      expect(adr?.files[0]?.relPath).toBe(join("adr", "0001-use-postgres.md"));
+    });
+
+    it("returns 200 with a per-artifact error when one artifact escapes the project root", async () => {
+      // Previously an unhandled PathEscapeError reached Hono and failed the whole request.
+      await writeFile(join(outsideRoot, "leaked.md"), "secret", "utf8");
+      const status = {
+        changeName: "active-one",
+        schemaName: "spec-driven",
+        artifacts: [
+          { id: "proposal", outputPath: "proposal.md", status: "done" },
+          { id: "adr", outputPath: "../../../adr/*.md", status: "done" },
+        ],
+        artifactPaths: {
+          proposal: {
+            existingOutputPaths: [join(root, "openspec/changes/active-one/proposal.md")],
+          },
+          adr: { existingOutputPaths: [join(outsideRoot, "leaked.md")] },
+        },
+      };
+      const app = appFor(
+        runFor({ status: { stdout: JSON.stringify(status) }, schemas: { stdout: SCHEMAS_STDOUT } }),
+      );
+
+      const response = await app.request("/api/changes/active-one");
+      expect(response.status).toBe(200);
+
+      const body = (await response.json()) as {
+        artifacts: Array<{ id: string; files: unknown[]; error?: { message: string } }>;
+      };
+      const adr = body.artifacts.find((a) => a.id === "adr");
+      expect(adr?.error?.message).toContain("outside the project root");
+      expect(adr?.files).toEqual([]);
+      // The readable sibling is still served, and the secret is not.
+      const proposal = body.artifacts.find((a) => a.id === "proposal");
+      expect(proposal?.error).toBeUndefined();
+      expect(proposal?.files).toHaveLength(1);
+    });
+
+    it("returns 404 for a name that decodes to a traversal, without reading", async () => {
+      // A decoy the traversal would reach: `<root>/node_modules/.openspec.yaml` sits inside
+      // the project root, so the widened boundary no longer refuses it. Only the identifier
+      // guard does.
+      await mkdir(join(root, "node_modules"), { recursive: true });
+      await writeFile(join(root, "node_modules", ".openspec.yaml"), "schema: pwned\n", "utf8");
+
+      let invocations = 0;
+      const app = createApp({
+        clientDir,
+        adapterOptions: {
+          projectRoot: root,
+          run: async () => {
+            invocations += 1;
+            return { exitCode: 0, stdout: "null", stderr: "" };
+          },
+        },
+      });
+
+      const response = await app.request("/api/changes/..%2F..%2Fnode_modules");
+      expect(response.status).toBe(404);
+      await expect(response.text()).resolves.not.toContain("pwned");
+      expect(invocations).toBe(0);
     });
 
     it("returns 404 for a name the binary does not recognize as an active change", async () => {
@@ -418,6 +519,40 @@ describe("the specs API routes", () => {
       const app = appFor(runFor({}));
 
       const response = await app.request("/api/specs/does-not-exist");
+      expect(response.status).toBe(404);
+    });
+
+    it("returns 404 for an id that decodes to a traversal, without reading or invoking the binary", async () => {
+      // A decoy the traversal would reach: it sits inside the project root, so the scoped
+      // reader would happily serve it. Only the identifier guard stops this, which is exactly
+      // why widening the boundary required adding one.
+      await mkdir(join(root, "secret"), { recursive: true });
+      await writeFile(join(root, "secret", "spec.md"), "## Requirement: Leaked", "utf8");
+
+      let invocations = 0;
+      const app = createApp({
+        clientDir,
+        adapterOptions: {
+          projectRoot: root,
+          run: async () => {
+            invocations += 1;
+            return { exitCode: 0, stdout: "null", stderr: "" };
+          },
+        },
+      });
+
+      // Hono matches the raw path but percent-decodes the parameter, so this reaches the
+      // handler as `../../secret`.
+      const response = await app.request("/api/specs/..%2F..%2Fsecret");
+      expect(response.status).toBe(404);
+      await expect(response.text()).resolves.not.toContain("Leaked");
+      // Refused before any path was built — the binary never saw the traversal either.
+      expect(invocations).toBe(0);
+    });
+
+    it("returns 404 for an absolute id", async () => {
+      const app = appFor(runFor({}));
+      const response = await app.request(`/api/specs/${encodeURIComponent("/etc/passwd")}`);
       expect(response.status).toBe(404);
     });
 

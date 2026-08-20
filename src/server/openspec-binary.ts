@@ -2,6 +2,9 @@ import { isAbsolute, resolve } from "node:path";
 import spawn from "cross-spawn";
 import semver from "semver";
 import { SUPPORTED_OPENSPEC_RANGE } from "../shared/version.js";
+// `openspec-data` imports only *types* from this module, so this edge introduces no
+// runtime cycle; it lets the project check reuse the one JSON parser and typed shape.
+import { type ChangesList, isResolvedRoot, parseCommandJson } from "./openspec-data.js";
 
 /** The name of the binary this dashboard shells out to, as it appears on `PATH`. */
 export const OPENSPEC_BINARY = "openspec";
@@ -113,12 +116,13 @@ export function isSupportedVersion(version: string): boolean {
  * root (`nearest`, `declared`, `store`) counts as a project; `implicit` does not.
  */
 export async function isOpenSpecProject(run: RunOpenSpec): Promise<boolean> {
-  const { exitCode, stdout } = await run(["list", "--json"]);
-  if (exitCode !== 0) return false;
+  const result = await run(["list", "--json"]);
+  if (result.exitCode !== 0) return false;
 
   try {
-    const parsed = JSON.parse(stdout) as { root?: { source?: string } };
-    return parsed.root?.source !== undefined && parsed.root.source !== "implicit";
+    // Parsed through the shared wrapper so the project check and root resolution read the
+    // same typed `root`, rather than each casting the body to its own inline shape.
+    return isResolvedRoot(parseCommandJson<ChangesList>(result, "list --json").root);
   } catch {
     return false;
   }

@@ -14,9 +14,18 @@ export interface ChangeDetailProps {
   historical?: boolean;
 }
 
-/** The first artifact with at least one file, so the initial tab is never an empty one. */
+/** Whether an artifact has something to show: files to render, or an error explaining why not. */
+function isSelectable(artifact: ResolvedArtifact): boolean {
+  return artifact.files.length > 0 || artifact.error !== undefined;
+}
+
+/**
+ * The first artifact with something to show, so the initial tab is never an empty one. An
+ * artifact that failed to read counts: its error is the content, and landing on it is better
+ * than opening a change that appears to have nothing in it.
+ */
 function firstSelectableArtifact(artifacts: ResolvedArtifact[]): string | undefined {
-  return artifacts.find((artifact) => artifact.files.length > 0)?.id;
+  return artifacts.find(isSelectable)?.id;
 }
 
 /**
@@ -48,13 +57,17 @@ function HeaderCard({ change, historical }: { change: ResolvedChange; historical
       </p>
 
       <div className="change-detail__progress">
+        {/* An indeterminate bar (no `value`) when the task artifact could not be read: its
+            zeroes mean "unknown", and showing them as a count would assert something false. */}
         <progress
           className="change-detail__progress-bar"
-          value={change.progress.completed}
+          value={change.progressUnknown ? undefined : change.progress.completed}
           max={Math.max(change.progress.total, 1)}
         />
         <span className="change-detail__progress-count">
-          {change.progress.completed} / {change.progress.total} tasks
+          {change.progressUnknown
+            ? "tasks could not be counted"
+            : `${change.progress.completed} / ${change.progress.total} tasks`}
         </span>
       </div>
 
@@ -92,6 +105,26 @@ function HeaderCard({ change, historical }: { change: ResolvedChange; historical
 function ArtifactBody({ artifact }: { artifact: ResolvedArtifact }) {
   const [fileIndex, setFileIndex] = useState(0);
   const file = artifact.files[Math.min(fileIndex, artifact.files.length - 1)];
+
+  // An artifact whose files could not be read reports why, in place of a body. This is the
+  // contained per-artifact failure: its siblings rendered normally, and the change did not
+  // fail as a whole. Distinct from an artifact with genuinely no files, whose tab is disabled.
+  if (artifact.error) {
+    return (
+      <div className="change-detail__artifact-error" role="alert">
+        <p className="change-detail__artifact-error-message">
+          This artifact's files could not be read: {artifact.error.message}
+        </p>
+        {artifact.error.details && artifact.error.details.length > 0 && (
+          <ul className="change-detail__artifact-error-details">
+            {artifact.error.details.map((detail) => (
+              <li key={detail}>{detail}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
 
   const body = (
     <div className="change-detail__file-body">
@@ -154,7 +187,7 @@ export function ChangeDetail({ change, historical = false }: ChangeDetailProps) 
 
       <div className="change-detail__tabs" role="tablist" aria-label="Artifacts">
         {change.artifacts.map((artifact) => {
-          const disabled = artifact.files.length === 0;
+          const disabled = !isSelectable(artifact);
           return (
             <button
               key={artifact.id}

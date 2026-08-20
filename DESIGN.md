@@ -98,8 +98,10 @@ follow the same "coloured text, not a tinted pill" rule.
 - **Hairlines over cards.** List rows and sidebar items are separated by a `1px solid --hair`
   rule (typically `border-bottom`), not a full bordered box. `--panel` is reserved for exactly
   one surface: the scenario block in rendered markdown. Alert/error callouts (a failed change
-  card, a spec validation error) are the deliberate exception and keep a full `--danger` border,
-  since they are meant to stand out from the reading chrome around them.
+  card, a spec validation error, an artifact whose files could not be read) are the deliberate
+  exception and keep a full `--danger` border, since they are meant to stand out from the
+  reading chrome around them. They share one shape — `--danger` border, `--radius-md`,
+  `--danger` text, an optional detail list — so a new one adds no tokens.
 - **Top bar.** `.app__header` has no bottom border — it fuses with `--bg` rather than being cut
   off by a hard rule. The active nav item is `--accent` text on an `--accent-tint` background;
   inactive items are `--muted`.

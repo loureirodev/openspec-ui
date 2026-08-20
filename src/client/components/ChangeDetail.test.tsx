@@ -196,3 +196,80 @@ describe("historical framing of spec deltas", () => {
     expect(details).not.toHaveAttribute("open");
   });
 });
+
+describe("progress the server could not compute", () => {
+  it("says so instead of asserting 0 / 0", () => {
+    render(
+      <ChangeDetail
+        change={change({ progress: { completed: 0, total: 0 }, progressUnknown: true })}
+      />,
+    );
+
+    expect(screen.getByText("tasks could not be counted")).toBeInTheDocument();
+    expect(screen.queryByText("0 / 0 tasks")).not.toBeInTheDocument();
+  });
+
+  it("shows the count normally when progress is known", () => {
+    render(<ChangeDetail change={change()} />);
+    expect(screen.getByText("1 / 2 tasks")).toBeInTheDocument();
+  });
+});
+
+describe("an artifact whose files could not be read", () => {
+  const withErroredArtifact = () =>
+    change({
+      artifacts: [
+        {
+          id: "proposal",
+          status: "done",
+          files: [
+            { path: "/p", relPath: "proposal.md", label: "proposal", markdown: "# Why this ships" },
+          ],
+        },
+        {
+          id: "adr",
+          status: "done",
+          files: [],
+          error: { kind: "unknown", message: "it resolves outside the project root." },
+        },
+      ],
+    });
+
+  it("renders the error in place of a body, and keeps the tab selectable", async () => {
+    render(<ChangeDetail change={withErroredArtifact()} />);
+
+    await userEvent.click(screen.getByRole("tab", { name: /adr/ }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /could not be read: it resolves outside the project root/,
+    );
+  });
+
+  it("still renders the sibling artifacts that resolved", () => {
+    render(<ChangeDetail change={withErroredArtifact()} />);
+
+    // The contained failure did not cost us the readable artifact: its body is on screen.
+    expect(screen.getByRole("tab", { name: /proposal/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Why this ships" })).toBeInTheDocument();
+  });
+
+  it("leaves an artifact with no files and no error disabled", () => {
+    render(
+      <ChangeDetail
+        change={change({
+          artifacts: [
+            {
+              id: "proposal",
+              status: "done",
+              files: [{ path: "/p", relPath: "proposal.md", label: "proposal", markdown: "# p" }],
+            },
+            // The archived out-of-tree case: nothing to show, and nothing went wrong.
+            { id: "adr", files: [] },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: /adr/ })).toBeDisabled();
+  });
+});

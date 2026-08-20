@@ -61,10 +61,17 @@ export function createApp(options: AppOptions = {}) {
   // straight through as 200 JSON: a broken binary yields a partial list, not a failed request.
   app.get("/api/changes", async (c) => c.json(await listChanges(adapterOptions)));
 
+  // `:name` has a change directory built from it, so it is validated as a bare identifier
+  // first; `activeChangeRef` returns null for anything else and this route 404s without a
+  // path being assembled. The binary separately rejects a well-formed name it does not know,
+  // which produces the other 404 below.
   app.get("/api/changes/:name", async (c) => {
     const name = c.req.param("name");
     try {
-      const resolved = await resolveChange(activeChangeRef(name, adapterOptions), adapterOptions);
+      const ref = await activeChangeRef(name, adapterOptions);
+      if (ref === null) return c.json({ error: "Not Found", path: c.req.path }, 404);
+
+      const resolved = await resolveChange(ref, adapterOptions);
       return c.json(resolved);
     } catch (error) {
       // The binary rejects a name it does not recognize as an active change with its own
@@ -80,6 +87,9 @@ export function createApp(options: AppOptions = {}) {
   // the binary.
   app.get("/api/archived", async (c) => c.json(await listArchivedChanges(adapterOptions)));
 
+  // `:id` is not validated as a bare identifier either: it is matched against names recovered
+  // from a directory listing, so an id that matches nothing simply 404s without a path being
+  // built from it.
   app.get("/api/archived/:id", async (c) => {
     const id = c.req.param("id");
     const ref = await findArchivedChange(id, adapterOptions);
@@ -103,11 +113,15 @@ export function createApp(options: AppOptions = {}) {
     }
   });
 
+  // This is the one route that assembles a filesystem path from a request parameter, so the
+  // id is validated as a bare name inside `resolveSpec` before any path is built. Hono
+  // percent-decodes route params, so `..%2F..%2Ffoo` arrives here as a real traversal.
   app.get("/api/specs/:id", async (c) => {
     const id = c.req.param("id");
     const resolved = await resolveSpec(id, adapterOptions);
-    // The one genuinely-absent case — no `spec.md` on disk — maps to 404. A malformed index
-    // still resolves (raw markdown plus a structured error) and passes through as 200.
+    // Both genuinely-absent cases map to 404: no `spec.md` on disk, and an id that is not a
+    // bare identifier. A malformed index still resolves (raw markdown plus a structured
+    // error) and passes through as 200.
     if (resolved === null) return c.json({ error: "Not Found", path: c.req.path }, 404);
     return c.json(resolved);
   });

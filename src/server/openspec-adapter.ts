@@ -6,14 +6,16 @@ import { collectMarkdown, pathKind } from "./fs-walk.js";
 import { runOpenSpec as defaultRunOpenSpec, type RunOpenSpec } from "./openspec-binary.js";
 import {
   type ChangeSummary,
-  OpenSpecValidationError,
+  isResolvedRoot,
   runListChanges,
   runListSpecs,
   runShowSpec,
   type SpecDetail,
   type SpecSummary,
+  type StructuredError,
+  toStructuredError,
 } from "./openspec-data.js";
-import { createScopedReader } from "./safe-file.js";
+import { createScopedReader, isBareIdentifier } from "./safe-file.js";
 import { type ResolvedSchema, readProjectDefaultSchema, resolveSchemaName } from "./schema.js";
 import { aggregateProgress, type Progress } from "./task-progress.js";
 
@@ -27,34 +29,19 @@ import { aggregateProgress, type Progress } from "./task-progress.js";
 export type { ArtifactFile, ChangeRef, ResolvedArtifact } from "./artifact-source.js";
 export { UNATTRIBUTED_ARTIFACT_ID } from "./artifact-source.js";
 export type { SpecDetail, SpecSummary } from "./openspec-data.js";
-export { OpenSpecToolError, OpenSpecValidationError } from "./openspec-data.js";
-export { PathEscapeError } from "./safe-file.js";
+export {
+  OpenSpecToolError,
+  OpenSpecValidationError,
+  type StructuredError,
+  toStructuredError,
+} from "./openspec-data.js";
+export { isBareIdentifier, PathEscapeError } from "./safe-file.js";
 export type { ResolvedSchema } from "./schema.js";
 export type { Progress } from "./task-progress.js";
 export { aggregateProgress, countCheckboxes } from "./task-progress.js";
 
 /** The artifact id whose files hold a change's task checkboxes, under the default schema. */
 const TASKS_ARTIFACT_ID = "tasks";
-
-/** A structured, renderable error: identity and category without a raw stack or leaked stderr. */
-export interface StructuredError {
-  kind: "validation" | "tool" | "unknown";
-  message: string;
-  /** Individual validation messages, when the failure was a validation error. */
-  details?: string[];
-}
-
-/** Maps any thrown value onto a structured error safe to render. */
-export function toStructuredError(error: unknown): StructuredError {
-  if (error instanceof OpenSpecValidationError) {
-    return { kind: "validation", message: error.message, details: error.messages };
-  }
-  if (error instanceof Error) {
-    const kind = error.name === "OpenSpecToolError" ? "tool" : "unknown";
-    return { kind, message: error.message };
-  }
-  return { kind: "unknown", message: String(error) };
-}
 
 /** One entry in a changes list: either a resolved change or, on failure, one carrying an `error`. */
 export interface ChangeListItem {
@@ -89,6 +76,12 @@ export interface ResolvedChange {
   artifacts: ResolvedArtifact[];
   /** Progress recomputed from the change's task files — independent of the `list --json` count. */
   progress: Progress;
+  /**
+   * Present only when the task-bearing artifact could not be read, so `progress` counts
+   * nothing and its zeroes mean "unknown", not "no tasks". Set server-side because which
+   * artifact carries the tasks is a schema concern the client must not encode.
+   */
+  progressUnknown?: boolean;
   /** The binary's suggested next steps; present only for the binary source. */
   nextSteps?: string[];
 }
@@ -107,13 +100,62 @@ export interface AdapterOptions {
   projectRoot?: string;
 }
 
-/** Expands public options into the fully-wired {@link AdapterDeps} the internals consume. */
-function resolveDeps(options: AdapterOptions = {}): AdapterDeps {
-  const projectRoot = options.projectRoot ?? process.cwd();
+/**
+ * Memoized root resolutions, keyed by the binary seam that produced them. Keying on `run`
+ * rather than on a module-level singleton keeps each injected stub's root independent, so a
+ * test never inherits the root another test resolved.
+ *
+ * Only a *resolved* root is ever stored. The working-directory fallback is deliberately not
+ * cached: it is a symptom of a broken environment, and caching it would outlive the breakage
+ * — a user who installed the binary and hit Refresh would keep reading the wrong tree for the
+ * life of the process, with a green health check and nothing to explain the empty project.
+ */
+const projectRootCache = new WeakMap<RunOpenSpec, string>();
+
+/**
+ * The project root, as the binary resolves it. The dashboard never infers the root from the
+ * working directory or by looking for an `openspec/` directory: the binary is the authority,
+ * which is what makes a launch from a subdirectory — and a store's root — resolve correctly.
+ *
+ * The root arrives on `list --json`, a command the adapter already uses, so no new command is
+ * introduced — but it is a separate invocation of it, costing one extra spawn on the first
+ * request a process serves. Thereafter the root is cached per binary seam, since a running
+ * dashboard's root does not move, so every later request pays nothing.
+ *
+ * When no root can be resolved — a missing or broken binary, or a working directory outside
+ * any project, where the binary reports an `implicit` root — the working directory stands in.
+ * That keeps the server serving, so `/api/health` can deliver the actual diagnostic instead
+ * of the process failing to start.
+ */
+export async function resolveProjectRoot(run: RunOpenSpec): Promise<string> {
+  const cached = projectRootCache.get(run);
+  if (cached !== undefined) return cached;
+
+  const resolved = await runListChanges(run)
+    .then((list) => (isResolvedRoot(list.root) ? list.root.path : null))
+    .catch(() => null);
+
+  if (resolved === null) return process.cwd();
+
+  projectRootCache.set(run, resolved);
+  return resolved;
+}
+
+/**
+ * Expands public options into the fully-wired {@link AdapterDeps} the internals consume.
+ * Asynchronous because the project root comes from the binary; an explicit
+ * {@link AdapterOptions.projectRoot} short-circuits the resolution entirely.
+ */
+async function resolveDeps(options: AdapterOptions = {}): Promise<AdapterDeps> {
+  const run = options.run ?? defaultRunOpenSpec;
+  const projectRoot = options.projectRoot ?? (await resolveProjectRoot(run));
   const openspecRoot = join(projectRoot, "openspec");
   return {
-    run: options.run ?? defaultRunOpenSpec,
-    readScoped: createScopedReader(openspecRoot),
+    run,
+    // Bound to the project root, not to `openspec/`: an artifact the schema generates
+    // elsewhere in the project must be readable. See safe-file.ts for why this is the
+    // boundary and what took over the containment it used to provide incidentally.
+    readScoped: createScopedReader(projectRoot),
     projectRoot,
     openspecRoot,
   };
@@ -169,7 +211,7 @@ async function discoverArchivedRefs(deps: AdapterDeps): Promise<ChangeRef[]> {
 export async function listArchivedChanges(
   options: AdapterOptions = {},
 ): Promise<ArchivedChangeSummary[]> {
-  const deps = resolveDeps(options);
+  const deps = await resolveDeps(options);
   const entries = await listArchiveDirEntries(deps);
   return entries.map(({ name, archivedDate }) => ({ name, archivedDate }));
 }
@@ -179,14 +221,29 @@ export async function findArchivedChange(
   name: string,
   options: AdapterOptions = {},
 ): Promise<ChangeRef | null> {
-  const deps = resolveDeps(options);
+  const deps = await resolveDeps(options);
   const refs = await discoverArchivedRefs(deps);
   return refs.find((ref) => ref.name === name) ?? null;
 }
 
-/** The {@link ChangeRef} for an active change name, by the binary's directory convention. */
-export function activeChangeRef(name: string, options: AdapterOptions = {}): ChangeRef {
-  const deps = resolveDeps(options);
+/**
+ * The {@link ChangeRef} for an active change name, by the binary's directory convention, or
+ * `null` when the name is not a bare identifier. Asynchronous because the change directory
+ * hangs off the resolved project root.
+ *
+ * The name is client-supplied and a directory is built from it here, which `resolveChange`
+ * then reads `.openspec.yaml` out of — so it is validated first, like a spec id. Before the
+ * read boundary widened to the project root, a traversal here was caught by the boundary
+ * itself; now that `<root>/node_modules` is inside the boundary, this guard is what stops it.
+ * Returning `null` mirrors {@link findArchivedChange}, so both detail routes 404 the same way.
+ */
+export async function activeChangeRef(
+  name: string,
+  options: AdapterOptions = {},
+): Promise<ChangeRef | null> {
+  if (!isBareIdentifier(name)) return null;
+
+  const deps = await resolveDeps(options);
   return { name, archived: false, changeDir: join(deps.openspecRoot, "changes", name) };
 }
 
@@ -276,7 +333,7 @@ async function isolate(
  * still resolve. Either way a consumer can serve HTTP 200 and render every failure inline.
  */
 export async function listChanges(options: AdapterOptions = {}): Promise<ChangeListResult> {
-  const deps = resolveDeps(options);
+  const deps = await resolveDeps(options);
 
   const [activeList, archivedRefs, projectDefault] = await Promise.all([
     // Isolate the binary list call so its failure degrades to a partial list, not a thrown one.
@@ -313,7 +370,7 @@ export async function resolveChange(
   ref: ChangeRef,
   options: AdapterOptions = {},
 ): Promise<ResolvedChange> {
-  const deps = resolveDeps(options);
+  const deps = await resolveDeps(options);
 
   const schema = await resolveSchemaName({
     readScoped: deps.readScoped,
@@ -322,9 +379,14 @@ export async function resolveChange(
   });
   const { artifacts, nextSteps } = await resolveArtifacts(deps, ref);
 
-  const taskMarkdown = artifacts
-    .filter((artifact) => artifact.id === TASKS_ARTIFACT_ID)
-    .flatMap((artifact) => artifact.files.map((file) => file.markdown));
+  const taskArtifacts = artifacts.filter((artifact) => artifact.id === TASKS_ARTIFACT_ID);
+  const taskMarkdown = taskArtifacts.flatMap((artifact) =>
+    artifact.files.map((file) => file.markdown),
+  );
+  // Containment is per artifact, so a failed task artifact contributes no files at all: the
+  // resulting `0 / 0` would otherwise read as "this change has no tasks" rather than "we
+  // could not tell". Reported rather than fabricated, like every other degraded field here.
+  const progressUnknown = taskArtifacts.some((artifact) => artifact.error !== undefined);
 
   return {
     name: ref.name,
@@ -332,19 +394,20 @@ export async function resolveChange(
     schema,
     artifacts,
     progress: aggregateProgress(taskMarkdown),
+    ...(progressUnknown ? { progressUnknown } : {}),
     nextSteps,
   };
 }
 
 /** The project's specs, as reported by `list --specs --json`. */
 export async function listSpecs(options: AdapterOptions = {}): Promise<SpecSummary[]> {
-  const deps = resolveDeps(options);
+  const deps = await resolveDeps(options);
   return (await runListSpecs(deps.run)).specs;
 }
 
 /** A single spec's body, as reported by `show <id> --type spec --json`. */
 export async function readSpec(id: string, options: AdapterOptions = {}): Promise<SpecDetail> {
-  const deps = resolveDeps(options);
+  const deps = await resolveDeps(options);
   return runShowSpec(deps.run, id);
 }
 
@@ -369,13 +432,19 @@ export interface ResolvedSpec {
  * one case that signals a genuine 404 (returned here as `null`), independent of whether the
  * index resolved; a JSON index that fails to parse or validate instead degrades to
  * `{ id, markdown, error }`, `index` omitted, so the route can still serve `200` with a
- * readable body.
+ * readable body. An `id` that is not a bare identifier is refused up front, also as `null`.
  */
 export async function resolveSpec(
   id: string,
   options: AdapterOptions = {},
 ): Promise<ResolvedSpec | null> {
-  const deps = resolveDeps(options);
+  // The id is client-supplied and a path is assembled from it below, so it is validated as a
+  // bare name *first*: rejected here, no path is ever built and no read is ever attempted.
+  // The scoped reader would also refuse an escape, but only after the fact — and it cannot
+  // tell that a parameter carrying a separator was never a valid spec id at all.
+  if (!isBareIdentifier(id)) return null;
+
+  const deps = await resolveDeps(options);
   const specPath = join(deps.openspecRoot, "specs", id, "spec.md");
 
   const [markdownResult, indexResult] = await Promise.allSettled([

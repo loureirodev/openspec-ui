@@ -33,6 +33,32 @@ export class OpenSpecToolError extends Error {
   }
 }
 
+/**
+ * A structured, renderable error: identity and category without a raw stack or leaked stderr.
+ *
+ * Defined here, alongside the error classes it maps, rather than in the adapter: both the
+ * adapter and the artifact sources produce these, and the adapter imports the artifact
+ * sources, so an adapter-owned definition would close an import cycle.
+ */
+export interface StructuredError {
+  kind: "validation" | "tool" | "unknown";
+  message: string;
+  /** Individual validation messages, when the failure was a validation error. */
+  details?: string[];
+}
+
+/** Maps any thrown value onto a structured error safe to render. */
+export function toStructuredError(error: unknown): StructuredError {
+  if (error instanceof OpenSpecValidationError) {
+    return { kind: "validation", message: error.message, details: error.messages };
+  }
+  if (error instanceof Error) {
+    const kind = error.name === "OpenSpecToolError" ? "tool" : "unknown";
+    return { kind, message: error.message };
+  }
+  return { kind: "unknown", message: String(error) };
+}
+
 /** A single entry in the binary's validation-failure `status` array. */
 interface ValidationStatusEntry {
   severity: string;
@@ -102,9 +128,35 @@ export interface ChangeSummary {
   status: string;
 }
 
+/**
+ * The OpenSpec root the binary resolved for the invocation, as reported alongside every
+ * `list` body. `source` distinguishes a genuinely resolved root (`nearest`, `declared`,
+ * `store`) from the `implicit` root the binary anchors at the working directory when it
+ * is outside any project — see {@link isResolvedRoot}.
+ */
+export interface ReportedRoot {
+  path: string;
+  source: string;
+}
+
 export interface ChangesList {
   changes: ChangeSummary[];
-  root?: { path: string; source: string };
+  root?: ReportedRoot;
+}
+
+/**
+ * Whether a reported root is one the binary actually resolved, as opposed to absent or the
+ * `implicit` fallback it anchors at the working directory outside any project. The single
+ * definition both the health check and root resolution consult, so "is this a project" and
+ * "which project" can never drift apart.
+ */
+export function isResolvedRoot(root: ReportedRoot | undefined): root is ReportedRoot {
+  if (root === undefined) return false;
+  // `source` and `path` are typed but arrive from untyped JSON, so their presence is checked
+  // rather than assumed: a body omitting `source` must not pass as a resolved root, and an
+  // empty `path` would collapse the read boundary onto the working directory.
+  if (typeof root.source !== "string" || root.source === "implicit") return false;
+  return typeof root.path === "string" && root.path.length > 0;
 }
 
 /** One spec as reported by `list --specs --json`. */
@@ -115,7 +167,7 @@ export interface SpecSummary {
 
 export interface SpecsList {
   specs: SpecSummary[];
-  root?: { path: string; source: string };
+  root?: ReportedRoot;
 }
 
 /** An artifact's completion status, in schema order, as reported by `status --change`. */

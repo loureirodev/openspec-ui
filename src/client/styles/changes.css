@@ -221,6 +221,22 @@
   color: var(--accent);
 }
 
+.change-detail__artifact-error {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  color: var(--danger);
+}
+
+.change-detail__artifact-error-message {
+  margin: 0;
+}
+
+.change-detail__artifact-error-details {
+  margin: var(--space-xs) 0 0;
+  padding-left: var(--space-lg);
+}
+
 .change-detail__historical-body {
   opacity: 0.75;
 }

@@ -1,7 +1,7 @@
 import { join, parse, relative, sep } from "node:path";
 import { collectMarkdown } from "./fs-walk.js";
 import type { RunOpenSpec } from "./openspec-binary.js";
-import { runStatus } from "./openspec-data.js";
+import { runStatus, type StructuredError, toStructuredError } from "./openspec-data.js";
 import type { ScopedReader } from "./safe-file.js";
 import { resolveArtifactOrder, resolveSchemaName } from "./schema.js";
 
@@ -47,6 +47,11 @@ export interface ResolvedArtifact {
   /** Set by the archived detail route on spec-delta artifacts, to frame them as history. */
   historical?: boolean;
   files: ArtifactFile[];
+  /**
+   * Present only when this artifact's files could not be read. `files` is then empty and the
+   * artifact's siblings are unaffected — see {@link readArtifactFiles}.
+   */
+  error?: StructuredError;
 }
 
 /** The result of resolving one change's artifacts: the artifacts and, for the binary source
@@ -142,6 +147,31 @@ function withLabels(files: UnlabeledFile[]): ArtifactFile[] {
 }
 
 /**
+ * Reads one artifact's files, containing any failure as that artifact's `error`.
+ *
+ * Containment sits at artifact granularity, not per file: an artifact rendered from a partial
+ * file set would be quietly wrong, whereas an artifact that reports it could not be read is
+ * honest. This mirrors the per-change containment the changes list already applies, one level
+ * down — where the detail view actually renders. Without it, a single unreadable file fails
+ * the whole detail request and the user sees none of the readable artifacts.
+ *
+ * A path refused for resolving outside the project root arrives here as an ordinary read
+ * failure and is contained like any other, so it can no longer reach the route unhandled.
+ */
+async function readArtifactFiles(
+  deps: AdapterDeps,
+  paths: string[],
+): Promise<Pick<ResolvedArtifact, "files" | "error">> {
+  try {
+    return {
+      files: withLabels(await Promise.all(paths.map((path) => toArtifactFile(deps, path)))),
+    };
+  } catch (error) {
+    return { files: [], error: toStructuredError(error) };
+  }
+}
+
+/**
  * Binary-backed source for an active change: iterate `artifacts[]` in the schema order the
  * binary reports and read each artifact's files from `artifactPaths[id].existingOutputPaths`.
  * This handles single-file, multi-file and custom schemas with no special-casing, because
@@ -159,12 +189,11 @@ export async function resolveArtifactsFromBinary(
   // resolve to no artifacts rather than throwing a `not iterable` TypeError to the caller.
   for (const artifact of status.artifacts ?? []) {
     const existing = artifactPaths[artifact.id]?.existingOutputPaths ?? [];
-    const files = withLabels(await Promise.all(existing.map((path) => toArtifactFile(deps, path))));
     artifacts.push({
       id: artifact.id,
       status: artifact.status,
       missingDeps: artifact.missingDeps,
-      files,
+      ...(await readArtifactFiles(deps, existing)),
     });
   }
   return { artifacts, nextSteps: status.nextSteps };
@@ -216,16 +245,15 @@ export async function resolveArtifactsFromFilesystem(
     // `status` and `missingDeps` are intentionally omitted: neither was persisted for an
     // archived change.
     const paths = markdownForArtifactId(changeDir, id, allMarkdown, consumed);
-    const files = withLabels(await Promise.all(paths.map((path) => toArtifactFile(deps, path))));
-    artifacts.push({ id, files });
+    artifacts.push({ id, ...(await readArtifactFiles(deps, paths)) });
   }
 
   const leftovers = allMarkdown.filter((path) => !consumed.has(path));
   if (leftovers.length > 0) {
-    const files = withLabels(
-      await Promise.all(leftovers.map((path) => toArtifactFile(deps, path))),
-    );
-    artifacts.push({ id: UNATTRIBUTED_ARTIFACT_ID, files });
+    artifacts.push({
+      id: UNATTRIBUTED_ARTIFACT_ID,
+      ...(await readArtifactFiles(deps, leftovers)),
+    });
   }
   // No `nextSteps`: those come only from a binary `status` call, never attempted here.
   return { artifacts };
