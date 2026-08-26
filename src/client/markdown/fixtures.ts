@@ -67,6 +67,63 @@ export const SCRIPT_INJECTION = `Some text.
 More text.
 `;
 
+/**
+ * A task file from the `spec-with-remote` schema: a flat nine-key frontmatter block over a
+ * `# Title` heading. Shaped after the real files that motivated frontmatter rendering.
+ */
+export const FLAT_FRONTMATTER_TASK = `---
+id: 1
+group: event-registration
+dependencies: []
+status: 1
+created: 2026-07-28
+estimated_hours: 8
+remote_id: 149609
+parent_issue_id: 0
+---
+
+# Incorporar el módulo Registration
+
+## Objetivos
+
+Añadir el módulo contribuido y su tipo de inscripción.
+`;
+
+/** The same schema's `design.md`: a frontmatter block declaring exactly one key. */
+export const SINGLE_KEY_FRONTMATTER = `---
+remote_id: 149608
+---
+
+## Contexto
+
+Background prose.
+`;
+
+/** Frontmatter that is not a flat mapping — a nested block and a sequence. */
+export const NESTED_FRONTMATTER = `---
+remote:
+  provider: redmine
+  issue: 12345
+tags:
+  - alpha
+  - beta
+---
+
+# Title
+
+Body prose.
+`;
+
+/** A document with no frontmatter whose body contains a genuine thematic break. */
+export const THEMATIC_BREAK_IN_BODY = `# Title
+
+Some prose.
+
+---
+
+More prose.
+`;
+
 /** A heading and bold text that match no semantic pattern, to verify plain-GFM fallback. */
 export const NON_MATCHING_CONTENT = `## Just a heading
 

@@ -6,7 +6,9 @@ import typescript from "highlight.js/lib/languages/typescript";
 import { isValidElement, type ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
+import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
+import { frontmatterHandler, looksLikeFrontmatter } from "../markdown/frontmatter.js";
 import { remarkTaskProgress } from "../markdown/remark-task-progress.js";
 import { remarkRequirementAnchors } from "../markdown/requirement-anchors.js";
 
@@ -110,14 +112,26 @@ export interface MarkdownViewerProps {
  * fragment exactly as it would render inside a full document — see design.md Decision 4.
  */
 export function MarkdownViewer({ markdown, requirementAnchors = false }: MarkdownViewerProps) {
-  const remarkPlugins = requirementAnchors
-    ? [remarkGfm, remarkTaskProgress, remarkRequirementAnchors]
-    : [remarkGfm, remarkTaskProgress];
+  // `remarkFrontmatter` is enabled per-document, not always: it claims any `---` delimited
+  // block at offset 0, so on a document that merely *opens* with a thematic break it would turn
+  // the prose that follows into the document's own metadata. See `looksLikeFrontmatter`.
+  const remarkPlugins = [
+    ...(looksLikeFrontmatter(markdown) ? [remarkFrontmatter] : []),
+    remarkGfm,
+    remarkTaskProgress,
+    ...(requirementAnchors ? [remarkRequirementAnchors] : []),
+  ];
 
   return (
     <div className="markdown-viewer">
       <Markdown
         remarkPlugins={remarkPlugins}
+        // Frontmatter is the one treatment that is not a remark plugin. `remarkFrontmatter`
+        // above only makes the block a `yaml` node; rendering it has to happen here, at the
+        // mdast → hast seam, because `mdast-util-to-hast` drops `yaml` nodes outright and the
+        // `data` annotation the other two plugins rely on cannot override that. See
+        // design.md Decision 2 in the `render-markdown-frontmatter` change.
+        remarkRehypeOptions={{ handlers: { yaml: frontmatterHandler } }}
         rehypePlugins={[[rehypeHighlight, { languages: HIGHLIGHT_LANGUAGES }]]}
         components={components}
       >

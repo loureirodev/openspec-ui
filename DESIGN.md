@@ -154,6 +154,41 @@ background operation:
 `.icon-button__glyph`, and its existing `useIsFetching` wiring drives both `aria-busy` and
 `disabled` — no separate state was needed.
 
+## Frontmatter metadata block
+
+A markdown file that opens with a YAML frontmatter block renders it as **document metadata**,
+before the body and quieter than it (`src/client/styles/markdown.css`, `.markdown-frontmatter`).
+The dashboard attaches no meaning to any key: values render as the literal text in the file,
+never as a link, a derived label, or a translated status. That is a hard rule, not a default —
+the viewer is schema-agnostic and the same block has to read correctly for a schema nobody here
+has seen.
+
+The block **adds no vocabulary**. It resolves entirely from existing roles:
+
+| part | treatment |
+|---|---|
+| key (`dt`) | the `.markdown-delta-header__label` treatment — mono, `--font-size-sm`, uppercase, `0.05em` tracking — in `--faint` |
+| value (`dd`) | mono, `--font-size-sm`, `--text`, with `overflow-wrap: anywhere` |
+| separator | one `1px solid --hair` bottom rule, per the hairline convention above |
+| non-flat fallback | the existing code-block treatment (`--track`, `--radius-md`) |
+
+`--panel` stays reserved for the scenario block: the metadata block claims **no filled surface**
+and no border box of its own.
+
+**Pairs flow, they do not align to a column.** Each `dt`/`dd` is grouped in a `div` (valid HTML5
+inside a `dl`), and those groups wrap as flex items. A fixed label column would have to be sized
+to the longest key — that is a layout that must know its content in advance. Flowing measures
+nothing: short pairs share a line, a long value wraps within the 680px reading measure with its
+key still adjacent to the start of it, and an unbreakable token breaks rather than widening the
+page. Nothing is ever truncated or elided; this is a read-only view of a file on disk, and
+hiding content to fit would misreport the source.
+
+**Accepted limitation: the block is never collapsed.** There is no disclosure control and no cap
+on how many pairs it shows, because a disclosure widget would be new interactive vocabulary. A
+document declaring an unusually large frontmatter therefore gets an unusually tall metadata
+block. This is recorded so a future change revisits it deliberately rather than discovering it
+as a bug — at the nine keys that motivated the feature, the block is three lines.
+
 ## Non-goals (for now)
 
 - No manual light/dark toggle. Theme follows `prefers-color-scheme` only.

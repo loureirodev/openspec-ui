@@ -99,6 +99,55 @@
   pointer-events: none;
 }
 
+/* Markdown viewer: frontmatter metadata block — a document's leading YAML, rendered before the
+   body and quieter than it. Adds no vocabulary: keys reuse the delta-label treatment, the
+   separator is the hairline convention (never a card or a filled surface — `--panel` stays the
+   scenario block's alone), and the non-flat fallback reuses the code-block treatment above.
+   Pairs flow and wrap rather than aligning to a fixed label column, so the layout needs to know
+   nothing about how many keys a document declares or how long they are. */
+
+.markdown-viewer .markdown-frontmatter,
+.markdown-viewer .markdown-frontmatter-raw {
+  margin: 0 0 var(--space-lg);
+  border-bottom: 1px solid var(--hair);
+}
+
+.markdown-viewer .markdown-frontmatter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-lg);
+  padding-bottom: var(--space-md);
+}
+
+.markdown-frontmatter__pair {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  /* Lets a long pair shrink and wrap inside itself instead of overflowing the reading column,
+     which is what keeps each key adjacent to the start of its own value. */
+  min-width: 0;
+}
+
+.markdown-frontmatter__key {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--faint);
+}
+
+.markdown-frontmatter__value {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  /* A single unbroken token — a URL, a hash — breaks rather than widening the page. */
+  overflow-wrap: anywhere;
+}
+
 /* Markdown viewer: per-section task progress */
 
 .markdown-task-section {
