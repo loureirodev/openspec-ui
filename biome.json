@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!dist", "!openspec"]
+    "includes": ["**", "!dist", "!openspec", "!references"]
   },
   "formatter": {
     "enabled": true,

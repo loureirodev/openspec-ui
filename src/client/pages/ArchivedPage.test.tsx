@@ -69,20 +69,19 @@ describe("the archived browser", () => {
 
     renderPage();
 
-    expect(await screen.findByText("old-feature")).toBeInTheDocument();
+    const row = await screen.findByRole("button", { name: /old-feature/ });
+    expect(row).toBeInTheDocument();
 
-    await userEvent.click(screen.getByText("old-feature"));
+    await userEvent.click(row);
 
     expect(await screen.findByRole("heading", { name: "Old Feature" })).toBeInTheDocument();
 
-    // No per-artifact status was supplied, so no fabricated status badge is rendered —
-    // only the closed-tone "historical" badge on the spec-delta artifact.
+    // No per-artifact status was supplied, and the historical framing carries no visible
+    // status text badge — the tab's icon and its accessible name ("historical") carry it.
     expect(screen.queryByText("done")).not.toBeInTheDocument();
-    const historicalBadges = screen.getAllByText("historical");
-    expect(historicalBadges.length).toBeGreaterThan(0);
-    for (const badge of historicalBadges) {
-      expect(badge.className).toContain("status-badge--closed");
-    }
+    expect(screen.queryByRole("img", { name: /status:/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /proposal — historical/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /specs — historical/i })).toBeInTheDocument();
 
     // Spec deltas are collapsed by default, expandable on demand.
     await userEvent.click(screen.getByRole("tab", { name: /specs/i }));

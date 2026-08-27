@@ -1,47 +1,9 @@
 /* Specs browser */
 
 .specs-browser {
-  display: grid;
-  grid-template-columns: 16rem 1fr;
+  display: flex;
+  align-items: flex-start;
   gap: var(--space-xl);
-  align-items: start;
-}
-
-.specs-sidebar__items {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.specs-sidebar__item-button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  width: 100%;
-  padding: var(--space-sm) var(--space-md);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.specs-sidebar__item-button--active {
-  background-color: var(--accent-tint);
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.specs-sidebar__count {
-  font-family: var(--font-mono);
-  color: var(--muted);
-  font-size: var(--font-size-sm);
 }
 
 .specs-sidebar__requirements {
@@ -50,13 +12,29 @@
   padding-left: var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
   border-left: 2px solid var(--hair);
 }
 
 .specs-sidebar__requirement-link {
+  display: block;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
   color: var(--muted);
+  text-decoration: none;
+}
+
+.specs-sidebar__requirement-link:hover,
+.specs-sidebar__requirement-link:focus-visible {
+  background-color: color-mix(in oklch, var(--accent) 6%, transparent);
+  color: var(--text);
+}
+
+.specs-sidebar__requirement-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .specs-sidebar__error {
@@ -71,21 +49,4 @@
 .specs-page__empty {
   color: var(--muted);
   font-style: italic;
-}
-
-.spec-detail__error {
-  padding: var(--space-sm) var(--space-md);
-  margin-bottom: var(--space-md);
-  border: 1px solid var(--danger);
-  border-radius: var(--radius-md);
-  color: var(--danger);
-}
-
-.spec-detail__error-message {
-  margin: 0;
-}
-
-.spec-detail__error-details {
-  margin: var(--space-xs) 0 0;
-  padding-left: var(--space-lg);
 }

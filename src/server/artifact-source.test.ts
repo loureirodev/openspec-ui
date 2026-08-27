@@ -255,7 +255,7 @@ describe("resolveArtifactsFromFilesystem", () => {
           ]),
         },
       }),
-      readScoped: createScopedReader(openspecRoot),
+      readScoped: createScopedReader(root, openspecRoot),
       projectRoot: root,
       openspecRoot,
     };
@@ -317,7 +317,7 @@ describe("resolveArtifactsFromFilesystem", () => {
     };
     const binaryDeps: AdapterDeps = {
       run: runFor({ status: { stdout: JSON.stringify(status) } }),
-      readScoped: createScopedReader(join(root, "openspec")),
+      readScoped: createScopedReader(root, join(root, "openspec")),
       projectRoot: root,
       openspecRoot: join(root, "openspec"),
     };

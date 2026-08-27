@@ -130,6 +130,21 @@ describe("listChanges — error isolation", () => {
     expect(changes.map((item) => item.name).sort()).toEqual(["active-one", "corrupt", "healthy"]);
   });
 
+  it("reports each change's directory, relative to the project root, as its path", async () => {
+    const { changes } = await listChanges(options);
+    const byName = Object.fromEntries(changes.map((item) => [item.name, item]));
+
+    // An active change's path is project-root-relative, not an absolute filesystem path — the
+    // client shows it verbatim in a tooltip, where an absolute path would leak local layout.
+    expect(byName["active-one"]?.path).toBe(join("openspec", "changes", "active-one"));
+
+    // An archived change's path reflects its archived location, not the active tree.
+    expect(byName.healthy?.path).toBe(join("openspec", "changes", "archive", "2026-07-01-healthy"));
+
+    // A change that failed to resolve carries no path — its other fields are best-effort too.
+    expect(byName.corrupt?.path).toBeUndefined();
+  });
+
   it("degrades to a partial list — archived changes plus a top-level error — when the binary list fails", async () => {
     // `list` returns non-JSON, so runListChanges rejects with a tool error.
     const { changes, error } = await listChanges({

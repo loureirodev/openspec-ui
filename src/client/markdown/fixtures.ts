@@ -129,3 +129,16 @@ export const NON_MATCHING_CONTENT = `## Just a heading
 
 Some prose with **Important** bold text that is not a scenario keyword.
 `;
+
+/** A task section whose heading is long enough to wrap onto two lines when rendered narrowly. */
+export const LONG_TASK_HEADING = `## 1. A section whose heading text is deliberately long enough that it is very likely to wrap across two lines in the reading column
+
+- [x] 1.1 Done
+- [ ] 1.2 Not done
+`;
+
+/** A heading containing an inline code fragment, to verify relative sizing inside headings. */
+export const HEADING_WITH_INLINE_CODE = `## Configure \`openspec.config.ts\` before running
+
+Some prose.
+`;

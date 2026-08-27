@@ -29,8 +29,8 @@ function ArchivedDetailView({ id, onBack }: { id: string; onBack: () => void }) 
 
   return (
     <>
-      <button type="button" className="form-button change-detail__back" onClick={onBack}>
-        Back to archived
+      <button type="button" className="change-detail__back-link" onClick={onBack}>
+        ← Archived
       </button>
       <ChangeDetail change={data} historical />
     </>

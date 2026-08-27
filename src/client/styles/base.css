@@ -158,3 +158,84 @@ code {
     transform: rotate(360deg);
   }
 }
+
+/* A list row or tab gets the same visible focus indicator the form-control vocabulary already
+   defines above — see design.md's "every interactive control has a visible focus state". */
+.changes-list__item-button:focus-visible,
+.archived-list__item-button:focus-visible,
+.change-detail__tab:focus-visible,
+.side-nav__item-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* The side-nav treatment — one sidebar shape shared by every pick-list beside a body pane. */
+
+.side-nav {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 16rem;
+  width: 16rem;
+  gap: var(--space-xs);
+}
+
+.side-nav__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.side-nav__item-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.side-nav__item-button:hover:not(.side-nav__item-button--active) {
+  background-color: color-mix(in oklch, var(--accent) 6%, transparent);
+}
+
+.side-nav__item-button--active {
+  background-color: var(--accent-tint);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.side-nav__item-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.side-nav__item-counter {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

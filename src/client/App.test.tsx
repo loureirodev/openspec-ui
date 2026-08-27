@@ -82,6 +82,17 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("the brand", () => {
+  it("renders one accessible OpenSpec UI brand image and no text brand label", async () => {
+    mockHealth(HEALTHY);
+    renderApp();
+    await screen.findByRole("heading", { name: "Changes" });
+
+    expect(screen.getAllByRole("img", { name: "OpenSpec UI" })).toHaveLength(1);
+    expect(screen.queryByText("OpenSpec", { selector: ".app__brand" })).not.toBeInTheDocument();
+  });
+});
+
 describe("the health gate", () => {
   it("renders a loading state and no page while health is pending", () => {
     mockPendingHealth();

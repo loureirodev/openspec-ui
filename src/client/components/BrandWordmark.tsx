@@ -1,0 +1,116 @@
+export function BrandWordmark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 784 80" shapeRendering="crispEdges" aria-hidden="true" className={className}>
+      <g fill="currentColor">
+        <rect x={16} y={0} width={16} height={16} />
+        <rect x={32} y={0} width={16} height={16} />
+        <rect x={0} y={16} width={16} height={16} />
+        <rect x={48} y={16} width={16} height={16} />
+        <rect x={0} y={32} width={16} height={16} />
+        <rect x={48} y={32} width={16} height={16} />
+        <rect x={0} y={48} width={16} height={16} />
+        <rect x={48} y={48} width={16} height={16} />
+        <rect x={16} y={64} width={16} height={16} />
+        <rect x={32} y={64} width={16} height={16} />
+        <rect x={80} y={0} width={16} height={16} />
+        <rect x={96} y={0} width={16} height={16} />
+        <rect x={112} y={0} width={16} height={16} />
+        <rect x={80} y={16} width={16} height={16} />
+        <rect x={128} y={16} width={16} height={16} />
+        <rect x={80} y={32} width={16} height={16} />
+        <rect x={96} y={32} width={16} height={16} />
+        <rect x={112} y={32} width={16} height={16} />
+        <rect x={128} y={32} width={16} height={16} />
+        <rect x={80} y={48} width={16} height={16} />
+        <rect x={80} y={64} width={16} height={16} />
+        <rect x={160} y={0} width={16} height={16} />
+        <rect x={176} y={0} width={16} height={16} />
+        <rect x={192} y={0} width={16} height={16} />
+        <rect x={208} y={0} width={16} height={16} />
+        <rect x={160} y={16} width={16} height={16} />
+        <rect x={160} y={32} width={16} height={16} />
+        <rect x={176} y={32} width={16} height={16} />
+        <rect x={192} y={32} width={16} height={16} />
+        <rect x={160} y={48} width={16} height={16} />
+        <rect x={160} y={64} width={16} height={16} />
+        <rect x={176} y={64} width={16} height={16} />
+        <rect x={192} y={64} width={16} height={16} />
+        <rect x={208} y={64} width={16} height={16} />
+        <rect x={240} y={0} width={16} height={16} />
+        <rect x={288} y={0} width={16} height={16} />
+        <rect x={240} y={16} width={16} height={16} />
+        <rect x={256} y={16} width={16} height={16} />
+        <rect x={288} y={16} width={16} height={16} />
+        <rect x={240} y={32} width={16} height={16} />
+        <rect x={272} y={32} width={16} height={16} />
+        <rect x={288} y={32} width={16} height={16} />
+        <rect x={240} y={48} width={16} height={16} />
+        <rect x={288} y={48} width={16} height={16} />
+        <rect x={240} y={64} width={16} height={16} />
+        <rect x={288} y={64} width={16} height={16} />
+        <rect x={336} y={0} width={16} height={16} />
+        <rect x={352} y={0} width={16} height={16} />
+        <rect x={368} y={0} width={16} height={16} />
+        <rect x={320} y={16} width={16} height={16} />
+        <rect x={336} y={32} width={16} height={16} />
+        <rect x={352} y={32} width={16} height={16} />
+        <rect x={368} y={48} width={16} height={16} />
+        <rect x={320} y={64} width={16} height={16} />
+        <rect x={336} y={64} width={16} height={16} />
+        <rect x={352} y={64} width={16} height={16} />
+        <rect x={400} y={0} width={16} height={16} />
+        <rect x={416} y={0} width={16} height={16} />
+        <rect x={432} y={0} width={16} height={16} />
+        <rect x={400} y={16} width={16} height={16} />
+        <rect x={448} y={16} width={16} height={16} />
+        <rect x={400} y={32} width={16} height={16} />
+        <rect x={416} y={32} width={16} height={16} />
+        <rect x={432} y={32} width={16} height={16} />
+        <rect x={448} y={32} width={16} height={16} />
+        <rect x={400} y={48} width={16} height={16} />
+        <rect x={400} y={64} width={16} height={16} />
+        <rect x={480} y={0} width={16} height={16} />
+        <rect x={496} y={0} width={16} height={16} />
+        <rect x={512} y={0} width={16} height={16} />
+        <rect x={528} y={0} width={16} height={16} />
+        <rect x={480} y={16} width={16} height={16} />
+        <rect x={480} y={32} width={16} height={16} />
+        <rect x={496} y={32} width={16} height={16} />
+        <rect x={512} y={32} width={16} height={16} />
+        <rect x={480} y={48} width={16} height={16} />
+        <rect x={480} y={64} width={16} height={16} />
+        <rect x={496} y={64} width={16} height={16} />
+        <rect x={512} y={64} width={16} height={16} />
+        <rect x={528} y={64} width={16} height={16} />
+        <rect x={576} y={0} width={16} height={16} />
+        <rect x={592} y={0} width={16} height={16} />
+        <rect x={560} y={16} width={16} height={16} />
+        <rect x={560} y={32} width={16} height={16} />
+        <rect x={560} y={48} width={16} height={16} />
+        <rect x={576} y={64} width={16} height={16} />
+        <rect x={592} y={64} width={16} height={16} />
+      </g>
+      <g fill="var(--brand)">
+        <rect x={656} y={0} width={16} height={16} />
+        <rect x={704} y={0} width={16} height={16} />
+        <rect x={656} y={16} width={16} height={16} />
+        <rect x={704} y={16} width={16} height={16} />
+        <rect x={656} y={32} width={16} height={16} />
+        <rect x={704} y={32} width={16} height={16} />
+        <rect x={656} y={48} width={16} height={16} />
+        <rect x={704} y={48} width={16} height={16} />
+        <rect x={672} y={64} width={16} height={16} />
+        <rect x={688} y={64} width={16} height={16} />
+        <rect x={736} y={0} width={16} height={16} />
+        <rect x={752} y={0} width={16} height={16} />
+        <rect x={768} y={0} width={16} height={16} />
+        <rect x={752} y={16} width={16} height={16} />
+        <rect x={752} y={32} width={16} height={16} />
+        <rect x={752} y={48} width={16} height={16} />
+        <rect x={736} y={64} width={16} height={16} />
+        <rect x={752} y={64} width={16} height={16} />
+        <rect x={768} y={64} width={16} height={16} />
+      </g>
+    </svg>
+  );
+}

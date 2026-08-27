@@ -8,9 +8,11 @@ import Markdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
+import { humanizeName } from "../lib/format.js";
 import { frontmatterHandler, looksLikeFrontmatter } from "../markdown/frontmatter.js";
 import { remarkTaskProgress } from "../markdown/remark-task-progress.js";
 import { remarkRequirementAnchors } from "../markdown/requirement-anchors.js";
+import { StatusIcon } from "./StatusIcon.js";
 
 /** The common-language subset OpenSpec content actually uses; see design.md Decision 1. */
 const HIGHLIGHT_LANGUAGES = {
@@ -33,6 +35,9 @@ const DELTA_OPERATION_CLASS: Record<string, string> = {
 const SCENARIO_HEADING = /^Scenario:\s/;
 const SCENARIO_KEYWORDS = new Set(["WHEN", "THEN", "AND", "GIVEN"]);
 
+/** A spec document's own `# <kebab-case-slug> Specification` title — see the `h1` override. */
+const SPEC_TITLE = /^([a-z][a-z0-9-]*) Specification$/i;
+
 /** Flattens a React children tree to its plain text, to pattern-match against source text. */
 function textContent(node: ReactNode): string {
   if (typeof node === "string" || typeof node === "number") return String(node);
@@ -42,15 +47,25 @@ function textContent(node: ReactNode): string {
 }
 
 const components: Components = {
+  h1({ children, ...props }) {
+    const text = textContent(children);
+    const match = SPEC_TITLE.exec(text);
+    if (match) {
+      return <h1 {...props}>{`${humanizeName(match[1] ?? "")} Specification`}</h1>;
+    }
+    return <h1 {...props}>{children}</h1>;
+  },
+
   h2({ children, ...props }) {
     const text = textContent(children);
     const delta = DELTA_HEADER.exec(text);
     if (delta) {
       const operation = delta[1] as keyof typeof DELTA_OPERATION_CLASS;
+      const rest = text.slice(operation.length);
       return (
         <h2 className={`markdown-delta-header ${DELTA_OPERATION_CLASS[operation]}`}>
           <span className="markdown-delta-header__label">{operation}</span>
-          {children}
+          {rest}
         </h2>
       );
     }
@@ -60,7 +75,7 @@ const components: Components = {
     if (typeof total === "number" && typeof done === "number") {
       return (
         <h2 className="markdown-task-section">
-          {children}
+          <span className="markdown-task-section__title">{children}</span>
           <span className="markdown-task-section__progress">
             {done} / {total}
           </span>
@@ -93,6 +108,15 @@ const components: Components = {
       );
     }
     return <strong {...props}>{children}</strong>;
+  },
+
+  input({ type, checked }) {
+    if (type !== "checkbox") return <input type={type} checked={checked} disabled readOnly />;
+    return (
+      <span role="img" aria-label={checked ? "done" : "not done"} className="markdown-task-icon">
+        <StatusIcon status={checked ? "task-done" : "task-todo"} size={24} decorative />
+      </span>
+    );
   },
 };
 

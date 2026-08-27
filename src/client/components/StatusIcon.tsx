@@ -1,71 +1,72 @@
-import { describePieSlice } from "../lib/pie-geometry.js";
+import type { ReactNode } from "react";
 
-export type IconStatus = "done" | "in-progress" | "ready" | "no-tasks" | "blocked" | "error";
+type IconKey =
+  | "done"
+  | "in-progress"
+  | "todo"
+  | "blocked"
+  | "error"
+  | "archived"
+  | "unknown"
+  | "task-done"
+  | "task-todo";
 
-/** Statuses this dashboard maps to a specific icon shape; anything else falls back to neutral. */
-const KNOWN_ICON_STATUSES: Record<string, IconStatus> = {
+/**
+ * The single source of state → (glyph, colour).
+ */
+const STATUS_TO_ICON: Record<string, IconKey> = {
   done: "done",
   complete: "done",
   "in-progress": "in-progress",
-  ready: "ready",
-  "no-tasks": "no-tasks",
+  "no-tasks": "todo",
+  ready: "todo",
   blocked: "blocked",
   error: "error",
+  closed: "archived",
+  archived: "archived",
+  "task-done": "task-done",
+  "task-todo": "task-todo",
 };
+
+const ICON_COLOR: Record<IconKey, string> = {
+  done: "var(--success)",
+  "in-progress": "var(--accent)",
+  todo: "var(--muted)",
+  blocked: "var(--danger)",
+  error: "var(--danger)",
+  archived: "var(--muted)",
+  unknown: "var(--faint)",
+  "task-done": "var(--success)",
+  "task-todo": "var(--muted)",
+};
+
+export const STATUS_ICON_SIZE = 20;
 
 export interface StatusIconProps {
   status: string;
-  /** Tasks completed so far — only meaningful (and only used) for `in-progress`. */
-  completed?: number;
-  /** Total tasks — only meaningful (and only used) for `in-progress`. */
-  total?: number;
-  /** Rendered size in `em`-equivalent pixels; the icon scales with the surrounding text. */
+  /** Rendered size in px; defaults to {@link STATUS_ICON_SIZE}. */
   size?: number;
   className?: string;
   /**
-   * Hides the icon from the accessibility tree — for callers (like `StatusBadge`) that
-   * already render the status as adjacent visible text, so the icon doesn't announce a
-   * second, potentially different, accessible name (e.g. `historical` framing overrides the
-   * icon's shape to a neutral "closed" glyph while the visible text still shows the real
-   * status; without this the icon's own label would contradict it).
+   * Hides the icon from the accessibility tree — for callers (like `StatusBadge`) that already
+   * render the status as adjacent visible text, so the icon doesn't announce a second,
+   * potentially different, accessible name.
    */
   decorative?: boolean;
 }
 
-const CENTER = 8;
-const RADIUS = 6;
-
 /**
- * A small inline-SVG status icon drawn from a fixed Linear-style vocabulary: `done` is a
- * filled circle with a check, `in-progress` fills radially to the exact `completed / total`
- * fraction (the icon *is* the progress bar), `ready` is a thin ring, `no-tasks` a dashed
- * ring, `blocked` a dashed dimmed ring, and `error` a ring with a cross. A `status` value
- * outside this vocabulary renders a neutral dashed ring rather than presenting as an error —
- * see the `status-indicators` capability.
+ * A small inline-SVG status icon drawn from the fixed vocabulary in `STATUS_TO_ICON`. A
+ * `status` value outside that vocabulary renders the neutral `unknown` glyph rather than
+ * presenting as an error — see the `status-indicators` capability.
  */
 export function StatusIcon({
   status,
-  completed,
-  total,
-  size = 16,
+  size = STATUS_ICON_SIZE,
   className,
   decorative = false,
 }: StatusIconProps) {
-  const known = KNOWN_ICON_STATUSES[status];
-
-  // `done` short-circuits an in-progress fill that reaches (or, from stale/inconsistent
-  // data, exceeds) 100%: a change with all tasks complete is `done`, never a full — or
-  // empty, since `describePieSlice` treats `fraction >= 1` as "no slice to draw" — in-progress
-  // wedge.
-  const effective: IconStatus | "neutral" =
-    known === "in-progress" && total !== undefined && total > 0 && (completed ?? 0) >= total
-      ? "done"
-      : (known ?? "neutral");
-
-  const fraction =
-    effective === "in-progress" && total !== undefined && total > 0
-      ? Math.min(Math.max((completed ?? 0) / total, 0), 1)
-      : undefined;
+  const key = STATUS_TO_ICON[status] ?? "unknown";
 
   return (
     <svg
@@ -74,120 +75,153 @@ export function StatusIcon({
       aria-hidden={decorative || undefined}
       width={size}
       height={size}
-      viewBox="0 0 16 16"
+      viewBox="0 0 24 24"
+      fill="none"
       className={className}
       data-status={status}
+      style={{ color: ICON_COLOR[key], flex: "none" }}
     >
-      {renderShape(effective, fraction)}
+      {ICON_GLYPH[key]}
     </svg>
   );
 }
 
-function renderShape(status: IconStatus | "neutral", fraction: number | undefined) {
-  switch (status) {
-    case "done":
-      return (
-        <>
-          <circle cx={CENTER} cy={CENTER} r={RADIUS} fill="var(--success)" />
-          <path
-            d="M5 8.2 L7 10.2 L11 5.8"
-            fill="none"
-            stroke="var(--bg)"
-            strokeWidth={1.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </>
-      );
+const RING =
+  "M7 3.33782C8.47087 2.48697 10.1786 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 10.1786 2.48697 8.47087 3.33782 7";
 
-    case "in-progress": {
-      const slice =
-        fraction !== undefined ? describePieSlice(CENTER, CENTER, RADIUS, fraction) : null;
-      return (
-        <>
-          <circle
-            cx={CENTER}
-            cy={CENTER}
-            r={RADIUS}
-            fill="none"
-            stroke="var(--track)"
-            strokeWidth={1.5}
-          />
-          {slice && <path d={slice} fill="var(--accent)" />}
-        </>
-      );
-    }
+const ICON_GLYPH: Record<IconKey, ReactNode> = {
+  // check-circle
+  done: (
+    <>
+      <path
+        d="M8.5 12.5L10.5 14.5L15.5 9.5"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d={RING} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    </>
+  ),
 
-    case "ready":
-      return (
-        <circle
-          cx={CENTER}
-          cy={CENTER}
-          r={RADIUS}
-          fill="none"
-          stroke="var(--muted)"
-          strokeWidth={1.25}
-        />
-      );
+  // play-circle
+  "in-progress": (
+    <>
+      <path
+        d="M13.8876 9.9348C14.9625 10.8117 15.5 11.2501 15.5 12C15.5 12.7499 14.9625 13.1883 13.8876 14.0652C13.5909 14.3073 13.2966 14.5352 13.0261 14.7251C12.7888 14.8917 12.5201 15.064 12.2419 15.2332C11.1695 15.8853 10.6333 16.2114 10.1524 15.8504C9.6715 15.4894 9.62779 14.7336 9.54038 13.2222C9.51566 12.7947 9.5 12.3757 9.5 12C9.5 11.6243 9.51566 11.2053 9.54038 10.7778C9.62779 9.26636 9.6715 8.51061 10.1524 8.1496C10.6333 7.78859 11.1695 8.11466 12.2419 8.76679C12.5201 8.93597 12.7888 9.10831 13.0261 9.27492C13.2966 9.46483 13.5909 9.69274 13.8876 9.9348Z"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      />
+      <path d={RING} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    </>
+  ),
 
-    case "no-tasks":
-      return (
-        <circle
-          cx={CENTER}
-          cy={CENTER}
-          r={RADIUS}
-          fill="none"
-          stroke="var(--faint)"
-          strokeWidth={1.25}
-          strokeDasharray="2 2"
-        />
-      );
+  // menu-dots
+  todo: (
+    <>
+      <path
+        d="M9 12C9 12.5523 8.55228 13 8 13C7.44772 13 7 12.5523 7 12C7 11.4477 7.44772 11 8 11C8.55228 11 9 11.4477 9 12Z"
+        fill="currentColor"
+      />
+      <path
+        d="M13 12C13 12.5523 12.5523 13 12 13C11.4477 13 11 12.5523 11 12C11 11.4477 11.4477 11 12 11C12.5523 11 13 11.4477 13 12Z"
+        fill="currentColor"
+      />
+      <path
+        d="M17 12C17 12.5523 16.5523 13 16 13C15.4477 13 15 12.5523 15 12C15 11.4477 15.4477 11 16 11C16.5523 11 17 11.4477 17 12Z"
+        fill="currentColor"
+      />
+      <path d={RING} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    </>
+  ),
 
-    case "blocked":
-      return (
-        <circle
-          cx={CENTER}
-          cy={CENTER}
-          r={RADIUS}
-          fill="none"
-          stroke="var(--danger)"
-          strokeWidth={1.25}
-          strokeDasharray="2 2"
-          opacity={0.6}
-        />
-      );
+  // pause-circle
+  blocked: (
+    <>
+      <path
+        d="M8 9.5C8 9.03406 8 8.80109 8.07612 8.61732C8.17761 8.37229 8.37229 8.17761 8.61732 8.07612C8.80109 8 9.03406 8 9.5 8C9.96594 8 10.1989 8 10.3827 8.07612C10.6277 8.17761 10.8224 8.37229 10.9239 8.61732C11 8.80109 11 9.03406 11 9.5V14.5C11 14.9659 11 15.1989 10.9239 15.3827C10.8224 15.6277 10.6277 15.8224 10.3827 15.9239C10.1989 16 9.96594 16 9.5 16C9.03406 16 8.80109 16 8.61732 15.9239C8.37229 15.8224 8.17761 15.6277 8.07612 15.3827C8 15.1989 8 14.9659 8 14.5V9.5Z"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      />
+      <path
+        d="M13 9.5C13 9.03406 13 8.80109 13.0761 8.61732C13.1776 8.37229 13.3723 8.17761 13.6173 8.07612C13.8011 8 14.0341 8 14.5 8C14.9659 8 15.1989 8 15.3827 8.07612C15.6277 8.17761 15.8224 8.37229 15.9239 8.61732C16 8.80109 16 9.03406 16 9.5V14.5C16 14.9659 16 15.1989 15.9239 15.3827C15.8224 15.6277 15.6277 15.8224 15.3827 15.9239C15.1989 16 14.9659 16 14.5 16C14.0341 16 13.8011 16 13.6173 15.9239C13.3723 15.8224 13.1776 15.6277 13.0761 15.3827C13 15.1989 13 14.9659 13 14.5V9.5Z"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      />
+      <path d={RING} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    </>
+  ),
 
-    case "error":
-      return (
-        <>
-          <circle
-            cx={CENTER}
-            cy={CENTER}
-            r={RADIUS}
-            fill="none"
-            stroke="var(--danger)"
-            strokeWidth={1.5}
-          />
-          <path
-            d="M5.5 5.5 L10.5 10.5 M10.5 5.5 L5.5 10.5"
-            stroke="var(--danger)"
-            strokeWidth={1.5}
-            strokeLinecap="round"
-          />
-        </>
-      );
+  // close-circle
+  error: (
+    <>
+      <path
+        d="M14.5 9.50002L9.5 14.5M9.49998 9.5L14.5 14.5"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+      <path d={RING} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    </>
+  ),
 
-    default:
-      return (
-        <circle
-          cx={CENTER}
-          cy={CENTER}
-          r={RADIUS}
-          fill="none"
-          stroke="var(--faint)"
-          strokeWidth={1.25}
-          strokeDasharray="2 2"
-        />
-      );
-  }
-}
+  // archive
+  archived: (
+    <>
+      <path
+        d="M9 12C9 11.5341 9 11.3011 9.07612 11.1173C9.17761 10.8723 9.37229 10.6776 9.61732 10.5761C9.80109 10.5 10.0341 10.5 10.5 10.5H13.5C13.9659 10.5 14.1989 10.5 14.3827 10.5761C14.6277 10.6776 14.8224 10.8723 14.9239 11.1173C15 11.3011 15 11.5341 15 12C15 12.4659 15 12.6989 14.9239 12.8827C14.8224 13.1277 14.6277 13.3224 14.3827 13.4239C14.1989 13.5 13.9659 13.5 13.5 13.5H10.5C10.0341 13.5 9.80109 13.5 9.61732 13.4239C9.37229 13.3224 9.17761 13.1277 9.07612 12.8827C9 12.6989 9 12.4659 9 12Z"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      />
+      <path
+        d="M20.5 7V13C20.5 16.7712 20.5 18.6569 19.3284 19.8284C18.1569 21 16.2712 21 12.5 21H11.5M3.5 7V13C3.5 16.7712 3.5 18.6569 4.67157 19.8284C5.37634 20.5332 6.3395 20.814 7.81608 20.9259"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+      <path
+        d="M12 3H4C3.05719 3 2.58579 3 2.29289 3.29289C2 3.58579 2 4.05719 2 5C2 5.94281 2 6.41421 2.29289 6.70711C2.58579 7 3.05719 7 4 7H20C20.9428 7 21.4142 7 21.7071 6.70711C22 6.41421 22 5.94281 22 5C22 4.05719 22 3.58579 21.7071 3.29289C21.4142 3 20.9428 3 20 3H16"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+    </>
+  ),
+
+  // minus-circle
+  unknown: (
+    <>
+      <path d="M15 12H9" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+      <path d={RING} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    </>
+  ),
+
+  // verified-check
+  "task-done": (
+    <>
+      <path
+        d="M8.5 12.5L10.5 14.5L15.5 9.5"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3.02907 13.0776C2.7032 12.3958 2.7032 11.6032 3.02907 10.9214C3.16997 10.6266 3.41023 10.3447 3.89076 9.78084C4.08201 9.55642 4.17764 9.44421 4.25796 9.32437C4.44209 9.04965 4.56988 8.74114 4.63393 8.41669C4.66188 8.27515 4.6736 8.12819 4.69706 7.83426C4.75599 7.09576 4.78546 6.72651 4.89427 6.41844C5.14594 5.70591 5.7064 5.14546 6.41893 4.89378C6.72699 4.78497 7.09625 4.7555 7.83475 4.69657C8.12868 4.67312 8.27564 4.66139 8.41718 4.63344C8.74163 4.56939 9.05014 4.4416 9.32485 4.25747C9.4447 4.17715 9.55691 4.08152 9.78133 3.89027C10.3452 3.40974 10.6271 3.16948 10.9219 3.02859C11.6037 2.70271 12.3963 2.70271 13.0781 3.02859C13.3729 3.16948 13.6548 3.40974 14.2187 3.89027C14.4431 4.08152 14.5553 4.17715 14.6752 4.25747C14.9499 4.4416 15.2584 4.56939 15.5828 4.63344C15.7244 4.66139 15.8713 4.67312 16.1653 4.69657C16.9038 4.7555 17.273 4.78497 17.5811 4.89378C18.2936 5.14546 18.8541 5.70591 19.1058 6.41844M4.89427 17.5806C5.14594 18.2931 5.7064 18.8536 6.41893 19.1053C6.72699 19.2141 7.09625 19.2435 7.83475 19.3025C8.12868 19.3259 8.27564 19.3377 8.41718 19.3656C8.74163 19.4297 9.05014 19.5574 9.32485 19.7416C9.44469 19.8219 9.55691 19.9175 9.78133 20.1088C10.3452 20.5893 10.6271 20.8296 10.9219 20.9705C11.6037 21.2963 12.3963 21.2963 13.0781 20.9705C13.3729 20.8296 13.6548 20.5893 14.2187 20.1088C14.4431 19.9175 14.5553 19.8219 14.6752 19.7416C14.9499 19.5574 15.2584 19.4297 15.5828 19.3656C15.7244 19.3377 15.8713 19.3259 16.1653 19.3025C16.9038 19.2435 17.273 19.2141 17.5811 19.1053C18.2936 18.8536 18.8541 18.2931 19.1058 17.5806C19.2146 17.2725 19.244 16.9033 19.303 16.1648C19.3264 15.8709 19.3381 15.7239 19.3661 15.5824C19.4301 15.2579 19.5579 14.9494 19.7421 14.6747C19.8224 14.5548 19.918 14.4426 20.1093 14.2182C20.5898 13.6543 20.8301 13.3724 20.971 13.0776C21.2968 12.3958 21.2968 11.6032 20.971 10.9214"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+    </>
+  ),
+
+  // verified-uncheck
+  "task-todo": (
+    <path
+      d="M3.02907 13.0776C2.7032 12.3958 2.7032 11.6032 3.02907 10.9214C3.16997 10.6266 3.41023 10.3447 3.89076 9.78084C4.08201 9.55642 4.17764 9.44421 4.25796 9.32437C4.44209 9.04965 4.56988 8.74114 4.63393 8.41669C4.66188 8.27515 4.6736 8.12819 4.69706 7.83426C4.75599 7.09576 4.78546 6.72651 4.89427 6.41844C5.14594 5.70591 5.7064 5.14546 6.41893 4.89378C6.72699 4.78497 7.09625 4.7555 7.83475 4.69657C8.12868 4.67312 8.27564 4.66139 8.41718 4.63344C8.74163 4.56939 9.05014 4.4416 9.32485 4.25747C9.4447 4.17715 9.55691 4.08152 9.78133 3.89027C10.3452 3.40974 10.6271 3.16948 10.9219 3.02859C11.6037 2.70271 12.3963 2.70271 13.0781 3.02859C13.3729 3.16948 13.6548 3.40974 14.2187 3.89027C14.4431 4.08152 14.5553 4.17715 14.6752 4.25747C14.9499 4.4416 15.2584 4.56939 15.5828 4.63344C15.7244 4.66139 15.8713 4.67312 16.1653 4.69657C16.9038 4.7555 17.273 4.78497 17.5811 4.89378C18.2936 5.14546 18.8541 5.70591 19.1058 6.41844M4.89427 17.5806C5.14594 18.2931 5.7064 18.8536 6.41893 19.1053C6.72699 19.2141 7.09625 19.2435 7.83475 19.3025C8.12868 19.3259 8.27564 19.3377 8.41718 19.3656C8.74163 19.4297 9.05014 19.5574 9.32485 19.7416C9.44469 19.8219 9.55691 19.9175 9.78133 20.1088C10.3452 20.5893 10.6271 20.8296 10.9219 20.9705C11.6037 21.2963 12.3963 21.2963 13.0781 20.9705C13.3729 20.8296 13.6548 20.5893 14.2187 20.1088C14.4431 19.9175 14.5553 19.8219 14.6752 19.7416C14.9499 19.5574 15.2584 19.4297 15.5828 19.3656C15.7244 19.3377 15.8713 19.3259 16.1653 19.3025C16.9038 19.2435 17.273 19.2141 17.5811 19.1053C18.2936 18.8536 18.8541 18.2931 19.1058 17.5806C19.2146 17.2725 19.244 16.9033 19.303 16.1648C19.3264 15.8709 19.3381 15.7239 19.3661 15.5824C19.4301 15.2579 19.5579 14.9494 19.7421 14.6747C19.8224 14.5548 19.918 14.4426 20.1093 14.2182C20.5898 13.6543 20.8301 13.3724 20.971 13.0776C21.2968 12.3958 21.2968 11.6032 20.971 10.9214"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+    />
+  ),
+};

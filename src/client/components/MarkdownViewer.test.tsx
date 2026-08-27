@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   BARE_SCENARIO_FRAGMENT,
   GFM_BASELINE,
+  HEADING_WITH_INLINE_CODE,
+  LONG_TASK_HEADING,
   NON_MATCHING_CONTENT,
   SCRIPT_INJECTION,
   SPEC_DELTA,
@@ -17,10 +19,12 @@ describe("the GFM baseline", () => {
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "foo" })).toBeInTheDocument();
 
-    const checkboxes = screen.getAllByRole("checkbox");
-    expect(checkboxes).toHaveLength(2);
-    expect(checkboxes[0]).toBeChecked();
-    expect(checkboxes[1]).not.toBeChecked();
+    // Task-list checkboxes render as the dashboard's own StatusIcon vocabulary, not a native
+    // `<input type="checkbox">` — see the "task-list checkboxes" describe block below.
+    const taskIcons = container.querySelectorAll(".markdown-task-icon svg");
+    expect(taskIcons).toHaveLength(2);
+    expect(taskIcons[0]).toHaveAttribute("data-status", "task-done");
+    expect(taskIcons[1]).toHaveAttribute("data-status", "task-todo");
 
     expect(container.querySelectorAll("pre code")).toHaveLength(2);
   });
@@ -52,25 +56,41 @@ describe("the GFM baseline", () => {
     expect(container.querySelector("script")).toBeNull();
   });
 
-  it("exposes no control that edits or persists the source", () => {
-    render(<MarkdownViewer markdown={GFM_BASELINE} />);
+  it("exposes no control that edits or persists the source — no native checkbox at all", () => {
+    const { container } = render(<MarkdownViewer markdown={GFM_BASELINE} />);
 
-    for (const checkbox of screen.getAllByRole("checkbox")) {
-      expect(checkbox).toBeDisabled();
-    }
+    // Not just "disabled": there is no `<input>` in the task list to begin with.
+    expect(container.querySelector(".task-list-item input")).toBeNull();
   });
 });
 
-describe("task sections", () => {
-  it("renders checkboxes read-only, reflecting checked state", () => {
-    render(<MarkdownViewer markdown={TASK_FILE} />);
+describe("task-list checkboxes", () => {
+  it("renders the dashboard's own StatusIcon vocabulary, not a native checkbox", () => {
+    const { container } = render(<MarkdownViewer markdown={TASK_FILE} />);
 
-    const checkboxes = screen.getAllByRole("checkbox");
-    expect(checkboxes).toHaveLength(5);
-    for (const checkbox of checkboxes) {
-      expect(checkbox).toBeDisabled();
-    }
-    expect(checkboxes.filter((checkbox) => (checkbox as HTMLInputElement).checked)).toHaveLength(3);
+    expect(container.querySelectorAll(".task-list-item input")).toHaveLength(0);
+
+    const icons = container.querySelectorAll(".markdown-task-icon svg");
+    expect(icons).toHaveLength(5);
+    expect(
+      Array.from(icons).filter((icon) => icon.getAttribute("data-status") === "task-done"),
+    ).toHaveLength(3);
+  });
+
+  it("renders a completed task item as the verified-check glyph and an incomplete one as verified-uncheck", () => {
+    const { container } = render(<MarkdownViewer markdown={TASK_FILE} />);
+
+    const items = container.querySelectorAll(".task-list-item");
+    // TASK_FILE's items: "1.1"/"1.2"/"2.1" are checked, "2.2"/"2.3" are not — index 0 is done,
+    // index 3 ("2.2 Write the tests") is the first incomplete item.
+    const done = items[0]?.querySelector(".markdown-task-icon svg");
+    const notDone = items[3]?.querySelector(".markdown-task-icon svg");
+
+    expect(done).toHaveAttribute("data-status", "task-done");
+    expect(done?.parentElement).toHaveAttribute("aria-label", "done");
+
+    expect(notDone).toHaveAttribute("data-status", "task-todo");
+    expect(notDone?.parentElement).toHaveAttribute("aria-label", "not done");
   });
 
   it("shows a per-section progress count without altering the heading or item text", () => {
@@ -83,6 +103,31 @@ describe("task sections", () => {
     expect(buildHeading).toHaveTextContent("1 / 3");
 
     expect(screen.getByText(/2\.2 Write the tests/)).toBeInTheDocument();
+  });
+
+  it("keeps the counter intact and unfragmented when the heading is long enough to wrap", () => {
+    const { container } = render(<MarkdownViewer markdown={LONG_TASK_HEADING} />);
+
+    // The counter is a single element carrying the whole "1 / 2" text, not split across
+    // separate text nodes the way an unconstrained flex item would fragment it.
+    const progress = container.querySelector(".markdown-task-section__progress");
+    expect(progress).not.toBeNull();
+    expect(progress?.textContent).toBe("1 / 2");
+    expect(progress?.childElementCount).toBe(0);
+
+    // The heading's own children are wrapped in a titled element the layout can size.
+    expect(container.querySelector(".markdown-task-section__title")).not.toBeNull();
+  });
+});
+
+describe("inline code inside a heading", () => {
+  it("renders sized relative to the heading rather than at a fixed absolute size", () => {
+    render(<MarkdownViewer markdown={HEADING_WITH_INLINE_CODE} />);
+
+    const heading = screen.getByRole("heading", { name: /Configure/ });
+    const code = heading.querySelector("code");
+    expect(code).not.toBeNull();
+    expect(code?.textContent).toBe("openspec.config.ts");
   });
 });
 
@@ -101,6 +146,26 @@ describe("spec deltas", () => {
     const removed = screen.getByRole("heading", { name: /REMOVED Requirements/ });
     expect(removed).toHaveClass("markdown-delta--removed");
     expect(removed.className).not.toBe(added.className);
+  });
+
+  it("does not repeat the operation word — it renders once in the label, not again in the heading text", () => {
+    const { container } = render(<MarkdownViewer markdown={SPEC_DELTA} />);
+
+    const added = screen.getByRole("heading", { name: /ADDED Requirements/ });
+    const label = added.querySelector(".markdown-delta-header__label");
+    expect(label).toHaveTextContent("ADDED");
+
+    // "ADDED" appears exactly once in the heading — inside the label — not a second time in
+    // the trailing text alongside it. The heading's own text content still reads "ADDED
+    // Requirements" (a space, not a doubled word) for anything that reads it directly, such
+    // as this accessible name.
+    expect(added.textContent?.match(/ADDED/g)).toHaveLength(1);
+    expect(added.textContent).toBe("ADDED Requirements");
+
+    // The label itself carries no font-size override, so it reads at the h2's own size.
+    expect(container.querySelector(".markdown-delta-header__label")).not.toHaveStyle({
+      fontSize: "0.875rem",
+    });
   });
 });
 
@@ -140,5 +205,22 @@ describe("degradation to plain GFM", () => {
     const bold = screen.getByText("Important");
     expect(bold.tagName).toBe("STRONG");
     expect(bold.className).toBe("");
+  });
+});
+
+describe("spec document titles", () => {
+  it("humanizes a spec document's own `<slug> Specification` h1", () => {
+    render(<MarkdownViewer markdown={"# task-progress Specification\n\nBody.\n"} />);
+
+    expect(
+      screen.getByRole("heading", { name: "Task Progress Specification" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/task-progress Specification/)).not.toBeInTheDocument();
+  });
+
+  it("leaves an h1 that doesn't match the spec-title shape untouched", () => {
+    render(<MarkdownViewer markdown={"# Just A Title\n\nBody.\n"} />);
+
+    expect(screen.getByRole("heading", { name: "Just A Title" })).toBeInTheDocument();
   });
 });

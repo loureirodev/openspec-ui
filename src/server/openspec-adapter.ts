@@ -1,5 +1,5 @@
 import { readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import type { AdapterDeps, ChangeRef, ResolvedArtifact } from "./artifact-source.js";
 import { resolveArtifacts } from "./artifact-source.js";
 import { collectMarkdown, pathKind } from "./fs-walk.js";
@@ -53,6 +53,13 @@ export interface ChangeListItem {
   totalTasks: number;
   lastModified?: string;
   schema?: ResolvedSchema;
+  /**
+   * The change's directory, relative to the project root — an archived change's `path`
+   * reflects its archived location, not the active-changes tree. Relative rather than
+   * absolute so the client's tooltip never leaks the local filesystem layout. Absent when the
+   * change failed to resolve, alongside the rest of that entry's best-effort fields.
+   */
+  path?: string;
   /** Present only when this change failed to resolve; its other fields are then best-effort. */
   error?: StructuredError;
 }
@@ -91,6 +98,8 @@ export interface ArchivedChangeSummary {
   name: string;
   /** The `YYYY-MM-DD` date recovered from the archive directory's name prefix. */
   archivedDate: string;
+  /** The change's archived directory, relative to the project root, for the row tooltip. */
+  path: string;
 }
 
 /** The adapter's public dependencies. A project root is enough to derive everything else. */
@@ -155,7 +164,7 @@ async function resolveDeps(options: AdapterOptions = {}): Promise<AdapterDeps> {
     // Bound to the project root, not to `openspec/`: an artifact the schema generates
     // elsewhere in the project must be readable. See safe-file.ts for why this is the
     // boundary and what took over the containment it used to provide incidentally.
-    readScoped: createScopedReader(projectRoot),
+    readScoped: createScopedReader(projectRoot, openspecRoot),
     projectRoot,
     openspecRoot,
   };
@@ -213,7 +222,11 @@ export async function listArchivedChanges(
 ): Promise<ArchivedChangeSummary[]> {
   const deps = await resolveDeps(options);
   const entries = await listArchiveDirEntries(deps);
-  return entries.map(({ name, archivedDate }) => ({ name, archivedDate }));
+  return entries.map(({ name, archivedDate, changeDir }) => ({
+    name,
+    archivedDate,
+    path: relative(deps.projectRoot, changeDir),
+  }));
 }
 
 /** Finds the {@link ChangeRef} for one archived change by its (de-prefixed) name, or `null`. */
@@ -287,6 +300,7 @@ async function resolveActiveItem(
     totalTasks: summary.totalTasks,
     lastModified: summary.lastModified,
     schema,
+    path: relative(deps.projectRoot, changeDir),
   };
 }
 
@@ -309,6 +323,7 @@ async function resolveArchivedItem(
     completedTasks: progress.completed,
     totalTasks: progress.total,
     schema,
+    path: relative(deps.projectRoot, ref.changeDir),
   };
 }
 

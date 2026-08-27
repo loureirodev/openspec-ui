@@ -129,4 +129,19 @@ describe("the specs browser", () => {
 
     expect(await screen.findByText(/no specs yet/i)).toBeInTheDocument();
   });
+
+  it("resolves the capabilities sidebar from the shared side-nav treatment", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse([{ id: "core", requirementCount: 2 }])),
+    );
+
+    const { container } = renderPage();
+    await screen.findByText("Core");
+
+    // The same class the change detail's multi-file rail resolves from — see
+    // `ChangeDetail.test.tsx`'s "resolves the file rail from the shared side-nav treatment".
+    expect(container.querySelector("nav.side-nav.specs-sidebar")).not.toBeNull();
+    expect(container.querySelector(".side-nav__item-button")).not.toBeNull();
+  });
 });

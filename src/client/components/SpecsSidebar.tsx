@@ -1,6 +1,7 @@
 import type { SpecSummary } from "../api/specs.js";
 import { humanizeName } from "../lib/format.js";
 import type { RequirementAnchor } from "../markdown/requirement-anchors.js";
+import { Tooltip } from "./Tooltip.js";
 
 export interface SpecsSidebarProps {
   specs: SpecSummary[];
@@ -30,25 +31,28 @@ export function SpecsSidebar({
   selectedRequirements,
 }: SpecsSidebarProps) {
   return (
-    <nav className="specs-sidebar" aria-label="Capabilities">
-      <ul className="specs-sidebar__items">
+    <nav className="side-nav specs-sidebar" aria-label="Capabilities">
+      <ul className="side-nav__items">
         {specs.map((spec) => {
           const isSelected = spec.id === selectedId;
           return (
             <li key={spec.id} className="specs-sidebar__item">
-              <button
-                type="button"
-                className={
-                  isSelected
-                    ? "specs-sidebar__item-button specs-sidebar__item-button--active"
-                    : "specs-sidebar__item-button"
-                }
-                aria-current={isSelected ? "true" : undefined}
-                onClick={() => onSelect(spec.id)}
-              >
-                <span className="specs-sidebar__title">{humanizeName(spec.id)}</span>
-                <span className="specs-sidebar__count">{spec.requirementCount}</span>
-              </button>
+              <Tooltip className="list-row__tooltip-wrapper" content={spec.id}>
+                <button
+                  type="button"
+                  className={
+                    isSelected
+                      ? "side-nav__item-button side-nav__item-button--active"
+                      : "side-nav__item-button"
+                  }
+                  aria-current={isSelected ? "true" : undefined}
+                  aria-label={`${humanizeName(spec.id)} — ${spec.id}`}
+                  onClick={() => onSelect(spec.id)}
+                >
+                  <span className="side-nav__item-label">{humanizeName(spec.id)}</span>
+                  <span className="side-nav__item-counter">{spec.requirementCount}</span>
+                </button>
+              </Tooltip>
 
               {isSelected && selectedRequirements && selectedRequirements.length > 0 && (
                 <ul className="specs-sidebar__requirements">

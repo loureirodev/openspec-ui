@@ -26,18 +26,26 @@
   flex-direction: column;
 }
 
-/* Hairline row separators rather than full-border cards — see design.md's reading-first
-   chrome. Each row carries its own bottom rule; the list border-collapses them into a
-   single ruled column. */
+.changes-list__item,
+.archived-list__item {
+  border-bottom: 1px solid var(--hair);
+}
+
+.changes-list__item:last-child,
+.archived-list__item:last-child {
+  border-bottom: none;
+}
+
+.list-row__tooltip-wrapper {
+  display: block;
+  width: 100%;
+}
+
 .changes-list__item-button,
 .archived-list__item-button {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
   width: 100%;
-  padding: var(--space-md) 0;
+  padding: var(--space-sm) 0;
   border: none;
-  border-bottom: 1px solid var(--hair);
   background: none;
   color: inherit;
   font: inherit;
@@ -46,125 +54,205 @@
 }
 
 .changes-list__row,
+.changes-list__row--placeholder,
 .archived-list__row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 7.25rem minmax(0, 1fr) 6rem 5rem 7.5rem;
   align-items: center;
   gap: var(--space-md);
 }
 
-/* The demoted secondary line: the row above already carries the mono name as identity, so
-   this humanized title reads quietly rather than competing for attention. */
+.archived-list__row {
+  grid-template-columns: 1.5rem minmax(0, 1fr) 6rem 5rem 7.5rem;
+}
+
 .changes-list__title,
 .archived-list__title {
-  color: var(--muted);
-  font-size: var(--font-size-sm);
-}
-
-.changes-list__item--failed {
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--danger);
-  border-radius: var(--radius-md);
-  color: var(--danger);
-}
-
-.changes-list__failed-title {
-  font-weight: 600;
-  margin: 0;
-}
-
-.changes-list__failed-message {
-  margin: var(--space-xs) 0 0;
-}
-
-/* The row's sole identity: the mono change name, in the primary text colour — the
-   humanized title is demoted to the quiet secondary line below it. */
-.changes-list__name,
-.archived-list__name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--text);
   font-weight: 600;
 }
 
-.changes-list__progress-count {
+.changes-list__meter {
+  width: 100%;
+}
+
+.changes-list__progress-count,
+.changes-list__last-modified {
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.changes-list__item-button--placeholder {
+  cursor: default;
+}
+
+.changes-list__row--placeholder {
+  min-height: calc(var(--font-size-base) * var(--line-height-base));
+}
+
+.changes-list__placeholder-block {
+  display: block;
+  justify-self: start;
+  width: 100%;
+  height: 0.9em;
+  border-radius: var(--radius-sm);
+  background-color: var(--track);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .changes-list__placeholder-block {
+    animation: changes-list-placeholder-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes changes-list-placeholder-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.changes-list__placeholder-block--icon {
+  width: 20px;
+  height: 20px;
+}
+
+.changes-list__placeholder-block--title {
+  width: 60%;
+}
+
+.changes-list__placeholder-block--meter {
+  width: 100%;
+  height: 6px;
+}
+
+.changes-list__placeholder-block--count {
+  width: 3rem;
+}
+
+.changes-list__placeholder-block--time {
+  width: 4.5rem;
 }
 
 /* Change detail */
 
-.change-detail__back {
-  margin-bottom: var(--space-md);
+.change-detail__back-link {
+  display: inline-block;
+  margin-bottom: var(--space-lg);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.change-detail__back-link:hover {
+  color: var(--accent);
+}
+
+.change-detail__back-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .change-detail__name {
+  margin: 0;
   color: var(--muted);
+  font-size: var(--font-size-sm);
 }
 
-.change-detail__progress {
+.change-detail__header h1 {
+  margin: 0.15rem 0 0;
+}
+
+/* One meta row: status, the recomputed-progress meter, its exact count, and last-modified. */
+.change-detail__meta {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-md);
   margin: var(--space-sm) 0 var(--space-md);
 }
 
-.change-detail__progress-bar {
-  width: 280px;
+.change-detail__meter {
+  width: 160px;
   max-width: 100%;
-  accent-color: var(--accent);
 }
 
-.change-detail__progress-count {
+.change-detail__progress-count,
+.change-detail__last-modified {
   font-family: var(--font-mono);
   color: var(--muted);
   font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
 }
 
-.change-detail__artifact-id {
-  font-family: var(--font-mono);
-}
-
-.change-detail__artifact-states {
-  list-style: none;
+.change-detail__next-steps-list {
   margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.change-detail__artifact-states li {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.change-detail__missing-deps {
-  color: var(--danger);
-  font-size: var(--font-size-sm);
+  padding-left: var(--space-lg);
 }
 
 .change-detail__tabs {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   gap: var(--space-xs);
+  background-color: var(--bg);
   border-bottom: 1px solid var(--hair);
   margin: var(--space-lg) 0 var(--space-md);
 }
 
 .change-detail__tab {
+  position: relative;
   padding: var(--space-sm) var(--space-md);
   border: none;
+  border-bottom: 2px solid transparent;
   background: none;
-  color: inherit;
+  color: var(--muted);
   font: inherit;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: var(--space-xs);
+  transition: color 0.16s ease;
+  text-transform: capitalize;
+}
+
+.change-detail__tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 1px;
+  background-color: var(--accent);
+  opacity: 0;
+  transform: scaleX(0.35);
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.change-detail__tab:hover:not(:disabled) {
+  color: var(--text);
 }
 
 .change-detail__tab--active {
+  color: var(--text);
   font-weight: 600;
-  border-bottom: 2px solid var(--accent);
+}
+
+.change-detail__tab--active::after {
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 .change-detail__tab--disabled {
@@ -173,10 +261,27 @@
   cursor: not-allowed;
 }
 
-/* A width-bounded two-column layout: a sticky file-label rail beside the file panel, so a
-   long relative path (available on hover via `title`) can never displace the layout — the
-   label itself is already short (see the server's distinguishing-segment rule), and this is
-   the belt to that suspenders. */
+.change-detail__tab-label {
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.change-detail__tab-label::after {
+  content: attr(data-label);
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .change-detail__tab,
+  .change-detail__tab::after {
+    transition: none;
+  }
+}
+
 .change-detail__file-body {
   display: flex;
   align-items: flex-start;
@@ -184,57 +289,28 @@
   margin-top: calc(var(--space-lg) * 2);
 }
 
-.change-detail__file-tabs {
-  display: flex;
-  flex-direction: column;
-  flex: 0 0 180px;
-  width: 180px;
-  gap: var(--space-xs);
+@media (prefers-reduced-motion: no-preference) {
+  .change-detail__file-body {
+    animation: change-detail-body-in 0.18s ease-out both;
+  }
+}
+
+@keyframes change-detail-body-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+.change-detail__file-rail {
+  position: sticky;
+  top: calc(3rem + var(--space-md));
+  background-color: var(--bg);
 }
 
 .change-detail__file-panel {
   min-width: 0;
   flex: 1;
-}
-
-.change-detail__file-tab {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: var(--space-xs) var(--space-sm);
-  border: none;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.change-detail__file-tab-label {
-  display: block;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.change-detail__file-tab--active {
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.change-detail__artifact-error {
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--danger);
-  border-radius: var(--radius-md);
-  color: var(--danger);
-}
-
-.change-detail__artifact-error-message {
-  margin: 0;
-}
-
-.change-detail__artifact-error-details {
-  margin: var(--space-xs) 0 0;
-  padding-left: var(--space-lg);
 }
 
 .change-detail__historical-body {

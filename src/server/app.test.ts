@@ -323,7 +323,34 @@ describe("the changes and archived API routes", () => {
       expect(adr?.files[0]?.relPath).toBe(join("adr", "0001-use-postgres.md"));
     });
 
-    it("returns 200 with a per-artifact error when one artifact escapes the project root", async () => {
+    it("contains a per-artifact error when a binary-reported path escapes to a non-markdown project file", async () => {
+      // A crafted schema `generates: "../../../.env"` (or an in-tree symlink) would resolve to
+      // a real file under the project root that is not an artifact. Widening the read boundary
+      // to the project root must not turn that into file disclosure.
+      await writeFile(join(root, ".env"), "SECRET=1", "utf8");
+      const status = {
+        changeName: "active-one",
+        schemaName: "spec-driven",
+        artifacts: [{ id: "adr", outputPath: "../../../.env", status: "done" }],
+        artifactPaths: { adr: { existingOutputPaths: [join(root, ".env")] } },
+      };
+      const app = appFor(
+        runFor({ status: { stdout: JSON.stringify(status) }, schemas: { stdout: SCHEMAS_STDOUT } }),
+      );
+
+      const response = await app.request("/api/changes/active-one");
+      expect(response.status).toBe(200);
+
+      const body = (await response.json()) as {
+        artifacts: Array<{ id: string; files: unknown[]; error?: { message: string } }>;
+      };
+      const adr = body.artifacts.find((a) => a.id === "adr");
+      expect(adr?.error?.message).toContain("outside the readable set");
+      expect(adr?.files).toEqual([]);
+      expect(JSON.stringify(body)).not.toContain("SECRET=1");
+    });
+
+    it("returns 200 with a per-artifact error when one artifact escapes the readable set", async () => {
       // Previously an unhandled PathEscapeError reached Hono and failed the whole request.
       await writeFile(join(outsideRoot, "leaked.md"), "secret", "utf8");
       const status = {
@@ -351,7 +378,7 @@ describe("the changes and archived API routes", () => {
         artifacts: Array<{ id: string; files: unknown[]; error?: { message: string } }>;
       };
       const adr = body.artifacts.find((a) => a.id === "adr");
-      expect(adr?.error?.message).toContain("outside the project root");
+      expect(adr?.error?.message).toContain("outside the readable set");
       expect(adr?.files).toEqual([]);
       // The readable sibling is still served, and the secret is not.
       const proposal = body.artifacts.find((a) => a.id === "proposal");
@@ -404,13 +431,20 @@ describe("the changes and archived API routes", () => {
       const response = await app.request("/api/archived");
       expect(response.status).toBe(200);
 
-      const body = (await response.json()) as Array<{ name: string; archivedDate: string }>;
+      const body = (await response.json()) as Array<{
+        name: string;
+        archivedDate: string;
+        path: string;
+      }>;
       expect(body).toEqual(
         expect.arrayContaining([
-          { name: "old-feature", archivedDate: "2026-07-01" },
-          { name: "corrupt", archivedDate: "2026-07-02" },
+          expect.objectContaining({ name: "old-feature", archivedDate: "2026-07-01" }),
+          expect.objectContaining({ name: "corrupt", archivedDate: "2026-07-02" }),
         ]),
       );
+      // Each entry's path is the change's real archived directory.
+      const oldFeature = body.find((entry) => entry.name === "old-feature");
+      expect(oldFeature?.path).toContain(join("changes", "archive", "2026-07-01-old-feature"));
     });
   });
 

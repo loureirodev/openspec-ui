@@ -8,8 +8,28 @@
 }
 
 .app__brand {
-  font-family: var(--font-display);
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--text);
+}
+
+.app__brand-icon {
+  display: block;
+  width: 18px;
+  height: 21px;
+}
+
+.app__brand-wordmark {
+  display: block;
+  width: 147px;
+  height: 15px;
+}
+
+@media (max-width: 640px) {
+  .app__brand-wordmark {
+    display: none;
+  }
 }
 
 .navigation {

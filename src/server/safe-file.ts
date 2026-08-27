@@ -1,5 +1,5 @@
 import { readFile, realpath } from "node:fs/promises";
-import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
+import { basename, dirname, extname, isAbsolute, relative, resolve } from "node:path";
 
 /**
  * The single choke point for reading project files. Every read resolves its target —
@@ -7,21 +7,29 @@ import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
  * before opening it, so no crafted `..` sequence or symlink can escape the project.
  * No consumer opens a project file directly.
  *
- * The boundary is the *project root*, not `<projectRoot>/openspec/`, because a schema may
- * direct an artifact to generate outside the OpenSpec tree — `generates: "../../../adr/*.md"`
- * resolves to `<repo>/adr/` — and the binary reports those resolved paths for the dashboard
- * to read. A boundary at `openspec/` made every such artifact unreadable.
+ * The outer boundary is the *project root*, not `<projectRoot>/openspec/`, because a schema
+ * may direct an artifact to generate outside the OpenSpec tree — `generates:
+ * "../../../adr/*.md"` resolves to `<repo>/adr/` — and the binary reports those resolved
+ * paths for the dashboard to read. A boundary at `openspec/` made every such artifact
+ * unreadable.
  *
- * Widening the boundary means it no longer incidentally contains a path assembled from a
+ * Widening it that far would let a crafted schema path or an in-tree symlink reach anything
+ * else in the repo — `.env`, `.git/config`, source files. So the containment `openspec/`
+ * used to provide is re-established as a second rule: *outside* the OpenSpec tree only
+ * markdown is readable (every out-of-tree artifact is markdown; schema config lives inside
+ * the tree). A symlink under `openspec/` that resolves to a non-markdown file elsewhere in
+ * the project is refused here for the same reason.
+ *
+ * Widening the boundary also means it no longer incidentally contains a path assembled from a
  * request parameter, so that concern is handled explicitly by {@link isBareIdentifier}:
  * this check answers "is this path inside the root", which cannot answer "was this
  * parameter meant to be a path at all".
  */
 
-/** Raised when a requested path resolves outside the project root. */
+/** Raised when a requested path resolves somewhere the dashboard may not read. */
 export class PathEscapeError extends Error {
   constructor(requestedPath: string) {
-    super(`Refusing to read ${requestedPath}: it resolves outside the project root.`);
+    super(`Refusing to read ${requestedPath}: it resolves outside the readable set.`);
     this.name = "PathEscapeError";
   }
 }
@@ -75,24 +83,39 @@ async function resolveReal(target: string): Promise<string> {
   }
 }
 
+/** Whether a resolved path is a markdown file — the only kind readable outside `openspec/`. */
+function isMarkdown(path: string): boolean {
+  return extname(path).toLowerCase() === ".md";
+}
+
 /**
- * Reads a file, but only if it resolves under `projectRoot`. The prefix check runs against
- * the resolved, symlink-followed path — never the raw string — so approval can never be
- * granted on a textual match that a symlink or `..` would later betray.
+ * Reads a file, but only if it resolves under `projectRoot` and — when it resolves outside
+ * `<projectRoot>/openspec/` — is a markdown file. Both checks run against the resolved,
+ * symlink-followed path, never the raw string, so approval can never be granted on a textual
+ * match that a symlink or `..` would later betray.
  */
-export async function readScopedFile(projectRoot: string, requestedPath: string): Promise<string> {
+export async function readScopedFile(
+  projectRoot: string,
+  openspecRoot: string,
+  requestedPath: string,
+): Promise<string> {
   const realRoot = await resolveReal(projectRoot);
   const realTarget = await resolveReal(requestedPath);
 
   if (!isWithin(realRoot, realTarget)) throw new PathEscapeError(requestedPath);
 
+  const realOpenspec = await resolveReal(openspecRoot);
+  if (!isWithin(realOpenspec, realTarget) && !isMarkdown(realTarget)) {
+    throw new PathEscapeError(requestedPath);
+  }
+
   return readFile(realTarget, "utf8");
 }
 
-/** A reader already bound to one project root, so callers pass only the target path. */
+/** A reader already bound to one project, so callers pass only the target path. */
 export type ScopedReader = (requestedPath: string) => Promise<string>;
 
-/** Builds a {@link ScopedReader} bound to a project root. */
-export function createScopedReader(projectRoot: string): ScopedReader {
-  return (requestedPath) => readScopedFile(projectRoot, requestedPath);
+/** Builds a {@link ScopedReader} bound to a project root and its `openspec/` tree. */
+export function createScopedReader(projectRoot: string, openspecRoot: string): ScopedReader {
+  return (requestedPath) => readScopedFile(projectRoot, openspecRoot, requestedPath);
 }

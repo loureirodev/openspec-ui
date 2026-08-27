@@ -27,15 +27,21 @@ function change(overrides: Partial<ResolvedChange> = {}): ResolvedChange {
 }
 
 describe("the header card", () => {
-  it("shows each artifact's state and the exact recomputed progress", () => {
+  it("shows the raw name, humanized title, and the exact recomputed progress", () => {
     render(<ChangeDetail change={change()} />);
 
+    expect(screen.getByText("add-foo")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Add Foo" })).toBeInTheDocument();
     expect(screen.getByText("1 / 2 tasks")).toBeInTheDocument();
-    expect(screen.getAllByText("done")).not.toHaveLength(0);
-    expect(screen.getAllByText("in-progress")).not.toHaveLength(0);
   });
 
-  it("shows a blocked artifact's missing dependencies", () => {
+  it("does not render a per-artifact states list in the header", () => {
+    const { container } = render(<ChangeDetail change={change()} />);
+
+    expect(container.querySelector(".change-detail__artifact-states")).toBeNull();
+  });
+
+  it("shows a blocked artifact's missing dependencies through its tab, not a header list", () => {
     render(
       <ChangeDetail
         change={change({
@@ -44,13 +50,15 @@ describe("the header card", () => {
       />,
     );
 
-    expect(screen.getByText(/blocked by: proposal/)).toBeInTheDocument();
+    const tab = screen.getByRole("tab", { name: /blocked by: proposal/ });
+    expect(tab).toBeInTheDocument();
   });
 
-  it("surfaces nextSteps when present", () => {
+  it("surfaces nextSteps as an info callout", () => {
     render(<ChangeDetail change={change({ nextSteps: ["Write the proposal."] })} />);
 
     expect(screen.getByText("Write the proposal.")).toBeInTheDocument();
+    expect(screen.getByText("Next steps")).toBeInTheDocument();
   });
 
   it("does not show nextSteps in the historical framing", () => {
@@ -61,8 +69,8 @@ describe("the header card", () => {
 });
 
 describe("two-level artifact tabs", () => {
-  it("renders one Level-1 tab per artifact, in schema order", () => {
-    render(<ChangeDetail change={change()} />);
+  it("renders one Level-1 tab per artifact, in schema order, with no separate status text badge", () => {
+    const { container } = render(<ChangeDetail change={change()} />);
 
     const tabs = screen.getAllByRole("tab", { name: /proposal|tasks/i });
     expect(tabs.map((tab) => tab.textContent)).toEqual(
@@ -71,6 +79,9 @@ describe("two-level artifact tabs", () => {
         expect.stringContaining("tasks"),
       ]),
     );
+    // The status is carried by the icon before the name and by the tooltip/accessible name —
+    // never restated as adjacent visible text.
+    expect(container.querySelector(".status-badge")).toBeNull();
   });
 
   it("dims and disables an artifact with no files", () => {
@@ -90,7 +101,7 @@ describe("two-level artifact tabs", () => {
     expect(screen.getByRole("heading", { level: 1, name: "proposal" })).toBeInTheDocument();
   });
 
-  it("shows Level-2 file tabs, labelled by the derived short label, for a multi-file artifact", async () => {
+  it("shows Level-2 file tabs, labelled by the humanized derived label, for a multi-file artifact", async () => {
     render(
       <ChangeDetail
         change={change({
@@ -107,19 +118,16 @@ describe("two-level artifact tabs", () => {
       />,
     );
 
-    const tabA = screen.getByRole("tab", { name: "a" });
-    const tabB = screen.getByRole("tab", { name: "b" });
-    expect(tabA).toBeInTheDocument();
-    expect(tabB).toBeInTheDocument();
-    // The full relative path stays available on hover via `title`, not in the label text.
-    expect(tabA).toHaveAttribute("title", "specs/a/spec.md");
-    expect(tabB).toHaveAttribute("title", "specs/b/spec.md");
+    const tabA = screen.getByRole("tab", { name: /^A — specs\/a\/spec\.md$/ });
+    const tabB = screen.getByRole("tab", { name: /^B — specs\/b\/spec\.md$/ });
+    expect(tabA).toHaveTextContent("A");
+    expect(tabB).toHaveTextContent("B");
 
     await userEvent.click(tabB);
     expect(screen.getByText("b spec")).toBeInTheDocument();
   });
 
-  it("keeps the file-tab column width-bounded even for a very long relative path", () => {
+  it("resolves the file rail from the shared side-nav treatment, width-bounded regardless of path length", () => {
     render(
       <ChangeDetail
         change={change({
@@ -144,7 +152,7 @@ describe("two-level artifact tabs", () => {
     );
 
     const tabs = screen.getByRole("tablist", { name: "Files" });
-    expect(tabs).toHaveClass("change-detail__file-tabs");
+    expect(tabs.closest(".side-nav")).not.toBeNull();
   });
 
   it("renders one tab per artifact from a custom schema with no code change", () => {
@@ -205,7 +213,7 @@ describe("progress the server could not compute", () => {
       />,
     );
 
-    expect(screen.getByText("tasks could not be counted")).toBeInTheDocument();
+    expect(screen.getAllByText("tasks could not be counted").length).toBeGreaterThan(0);
     expect(screen.queryByText("0 / 0 tasks")).not.toBeInTheDocument();
   });
 
@@ -235,7 +243,7 @@ describe("an artifact whose files could not be read", () => {
       ],
     });
 
-  it("renders the error in place of a body, and keeps the tab selectable", async () => {
+  it("renders the error as a danger callout in place of a body, and keeps the tab selectable", async () => {
     render(<ChangeDetail change={withErroredArtifact()} />);
 
     await userEvent.click(screen.getByRole("tab", { name: /adr/ }));
@@ -243,6 +251,14 @@ describe("an artifact whose files could not be read", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       /could not be read: it resolves outside the project root/,
     );
+  });
+
+  it("marks the tab with an error status, not the stale `done` the binary reported", () => {
+    render(<ChangeDetail change={withErroredArtifact()} />);
+
+    const tab = screen.getByRole("tab", { name: /^adr — could not be read$/ });
+    expect(tab.querySelector('[data-status="error"]')).toBeInTheDocument();
+    expect(tab.querySelector('[data-status="done"]')).not.toBeInTheDocument();
   });
 
   it("still renders the sibling artifacts that resolved", () => {

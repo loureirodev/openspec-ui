@@ -8,10 +8,12 @@
   --muted: oklch(48% 0.02 72);
   --faint: oklch(62% 0.018 75);
 
-  /* The accent is the only cold hue (ink navy) — distinct from --danger so
-     "interactive" is never confused with "error". See design.md Decision 1. */
-  --accent: oklch(42% 0.11 255);
-  --accent-tint: oklch(92% 0.03 255);
+  /* The accent is the only cold hue (teal) — distinct from --danger so
+     "interactive" is never confused with "error", and close to complementary
+     with the terracotta --brand so the two warm/cold hues harmonize rather
+     than clash. See design.md Decision 1. */
+  --accent: oklch(45% 0.1 205);
+  --accent-tint: oklch(92% 0.03 205);
 
   --success: oklch(52% 0.14 150);
   --warning: oklch(56% 0.13 85);
@@ -19,6 +21,11 @@
 
   /* Renamed-delta / secondary syntax accent — a violet distinct from accent and danger. */
   --renamed: oklch(50% 0.16 300);
+
+  /* The brand mark's terracotta (#DD6E42). Theme-invariant — a brand colour, not a semantic
+     role, so it carries no dark-theme override below. Reserved for the brand mark only: it
+     sits close in hue to `--danger` and MUST NOT encode state — see design.md. */
+  --brand: oklch(66% 0.151 41);
 
   /* Typographic font roles */
   --font-display: "Fraunces", Georgia, serif;
@@ -60,8 +67,8 @@
     --muted: oklch(72% 0.011 80);
     --faint: oklch(56% 0.012 80);
 
-    --accent: oklch(72% 0.1 255);
-    --accent-tint: oklch(32% 0.06 255);
+    --accent: oklch(74% 0.1 205);
+    --accent-tint: oklch(33% 0.06 205);
 
     --success: oklch(76% 0.14 150);
     --warning: oklch(80% 0.13 85);
