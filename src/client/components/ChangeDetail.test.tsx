@@ -1,28 +1,37 @@
 import { render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import type { ResolvedChange } from "../api/changes.js";
+import type { ResolvedArtifact, ResolvedChange } from "../api/changes.js";
 import { ChangeDetail } from "./ChangeDetail.js";
 
-function change(overrides: Partial<ResolvedChange> = {}): ResolvedChange {
+/** Artifact overrides need only `id`; `collection` defaults to singular unless stated. */
+type ArtifactOverride = Partial<ResolvedArtifact> & Pick<ResolvedArtifact, "id">;
+type ChangeOverrides = Partial<Omit<ResolvedChange, "artifacts">> & {
+  artifacts?: ArtifactOverride[];
+};
+
+const DEFAULT_ARTIFACTS: ArtifactOverride[] = [
+  {
+    id: "proposal",
+    status: "done",
+    files: [{ path: "/p", relPath: "proposal.md", label: "proposal", markdown: "# proposal" }],
+  },
+  {
+    id: "tasks",
+    status: "in-progress",
+    files: [{ path: "/t", relPath: "tasks.md", label: "tasks", markdown: "- [x] a\n- [ ] b" }],
+  },
+];
+
+function change(overrides: ChangeOverrides = {}): ResolvedChange {
+  const { artifacts = DEFAULT_ARTIFACTS, ...rest } = overrides;
   return {
     name: "add-foo",
     archived: false,
     schema: { name: "spec-driven", inferred: false },
     progress: { completed: 1, total: 2 },
-    artifacts: [
-      {
-        id: "proposal",
-        status: "done",
-        files: [{ path: "/p", relPath: "proposal.md", label: "proposal", markdown: "# proposal" }],
-      },
-      {
-        id: "tasks",
-        status: "in-progress",
-        files: [{ path: "/t", relPath: "tasks.md", label: "tasks", markdown: "- [x] a\n- [ ] b" }],
-      },
-    ],
-    ...overrides,
+    artifacts: artifacts.map((artifact) => ({ collection: false, files: [], ...artifact })),
+    ...rest,
   };
 }
 
@@ -99,6 +108,76 @@ describe("two-level artifact tabs", () => {
 
     expect(screen.queryByRole("tablist", { name: "Files" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "proposal" })).toBeInTheDocument();
+  });
+
+  it("shows the file rail for a single-file collection artifact, labelled by its capability", () => {
+    render(
+      <ChangeDetail
+        change={change({
+          artifacts: [
+            {
+              id: "specs",
+              collection: true,
+              files: [
+                {
+                  path: "/s",
+                  relPath: "specs/openspec-data-access/spec.md",
+                  label: "openspec-data-access",
+                  markdown: "# ADDED Requirements",
+                },
+              ],
+            },
+          ],
+        })}
+      />,
+    );
+
+    const rail = screen.getByRole("tablist", { name: "Files" });
+    expect(rail.closest(".side-nav")).not.toBeNull();
+    expect(
+      screen.getByRole("tab", {
+        name: /^Openspec Data Access — specs\/openspec-data-access\/spec\.md$/,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("skips the file rail for a single-file singular artifact", () => {
+    render(
+      <ChangeDetail
+        change={change({
+          artifacts: [
+            {
+              id: "proposal",
+              collection: false,
+              files: [{ path: "/p", relPath: "proposal.md", label: "proposal", markdown: "# why" }],
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.queryByRole("tablist", { name: "Files" })).not.toBeInTheDocument();
+  });
+
+  it("still shows the file rail for a singular artifact that resolved more than one file", () => {
+    render(
+      <ChangeDetail
+        change={change({
+          artifacts: [
+            {
+              id: "tasks",
+              collection: false,
+              files: [
+                { path: "/a", relPath: "tasks/a.md", label: "a", markdown: "# a" },
+                { path: "/b", relPath: "tasks/b.md", label: "b", markdown: "# b" },
+              ],
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("tablist", { name: "Files" })).toBeInTheDocument();
   });
 
   it("shows Level-2 file tabs, labelled by the humanized derived label, for a multi-file artifact", async () => {

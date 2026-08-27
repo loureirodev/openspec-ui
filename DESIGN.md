@@ -202,10 +202,17 @@ technical value" consistently across single- and two-line content.
 pick-list beside a body pane: a 16rem rail, `--radius-sm` items, an `--accent-tint` active
 state, and a mono secondary counter. Global (not a CSS Module) because it is shared by two
 existing globally-styled views — the specs browser's capability sidebar and the change
-detail's multi-file rail — so a per-component module would fork the moment either one changed.
+detail's Level-2 file rail — so a per-component module would fork the moment either one changed.
 Each item's label is a human-readable form of its underlying identifier or file label; the raw
 value is available as supplementary detail (a `title` attribute or a `Tooltip`), never the
 visible label itself.
+
+The change detail's Level-2 file rail appears for **every collection artifact** (one whose
+schema permits many files, e.g. `specs`), regardless of how many files it currently holds, and
+for **any artifact with more than one file**. It is skipped only by a *singular* artifact with
+exactly one file (`proposal`, `design`, `tasks`), whose single file is the artifact and needs
+no pick-list. A lone collection member is labelled by its capability directory (the humanized
+form of `openspec-data-access`), never the structural `spec` basename.
 
 ## Reversed rules
 

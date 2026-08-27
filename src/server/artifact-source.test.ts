@@ -86,6 +86,8 @@ describe("resolveArtifactsFromBinary", () => {
       artifacts: [{ id: "specs", outputPath: "specs/**/*.md", status: "in-progress" }],
       artifactPaths: {
         specs: {
+          outputPath: "specs/**/*.md",
+          resolvedOutputPath: "/proj/openspec/changes/demo/specs/**/*.md",
           existingOutputPaths: [
             "/proj/openspec/changes/demo/specs/user-auth/spec.md",
             "/proj/openspec/changes/demo/specs/data-export/spec.md",
@@ -219,6 +221,118 @@ describe("resolveArtifactsFromBinary", () => {
     expect(artifacts[0]?.status).toBe("done");
   });
 
+  it("marks a glob output pattern as a collection and a literal path as singular", async () => {
+    const status = {
+      changeName: "demo",
+      schemaName: "spec-driven",
+      artifacts: [
+        { id: "proposal", outputPath: "proposal.md", status: "done" },
+        { id: "specs", outputPath: "specs/**/*.md", status: "in-progress" },
+      ],
+      artifactPaths: {
+        proposal: {
+          outputPath: "proposal.md",
+          existingOutputPaths: ["/proj/openspec/changes/demo/proposal.md"],
+        },
+        specs: {
+          outputPath: "specs/**/*.md",
+          resolvedOutputPath: "/proj/openspec/changes/demo/specs/**/*.md",
+          existingOutputPaths: ["/proj/openspec/changes/demo/specs/openspec-data-access/spec.md"],
+        },
+      },
+    };
+    const deps: AdapterDeps = {
+      run: runFor({ status: { stdout: JSON.stringify(status) } }),
+      readScoped: readerFor({
+        "/proj/openspec/changes/demo/proposal.md": "# proposal",
+        "/proj/openspec/changes/demo/specs/openspec-data-access/spec.md": "# spec",
+      }),
+      projectRoot: PROJECT_ROOT,
+      openspecRoot: OPENSPEC_ROOT,
+    };
+
+    const { artifacts } = await resolveArtifactsFromBinary(deps, "demo");
+
+    expect(artifacts.map((a) => [a.id, a.collection])).toEqual([
+      ["proposal", false],
+      ["specs", true],
+    ]);
+  });
+
+  it("labels a lone collection member by its capability directory, not `spec`", async () => {
+    const status = {
+      changeName: "demo",
+      schemaName: "spec-driven",
+      artifacts: [{ id: "specs", outputPath: "specs/**/*.md", status: "in-progress" }],
+      artifactPaths: {
+        specs: {
+          outputPath: "specs/**/*.md",
+          resolvedOutputPath: "/proj/openspec/changes/demo/specs/**/*.md",
+          existingOutputPaths: ["/proj/openspec/changes/demo/specs/openspec-data-access/spec.md"],
+        },
+      },
+    };
+    const deps: AdapterDeps = {
+      run: runFor({ status: { stdout: JSON.stringify(status) } }),
+      readScoped: readerFor({
+        "/proj/openspec/changes/demo/specs/openspec-data-access/spec.md": "# spec",
+      }),
+      projectRoot: PROJECT_ROOT,
+      openspecRoot: OPENSPEC_ROOT,
+    };
+
+    const { artifacts } = await resolveArtifactsFromBinary(deps, "demo");
+
+    expect(artifacts[0]?.collection).toBe(true);
+    expect(artifacts[0]?.files.map((f) => f.label)).toEqual(["openspec-data-access"]);
+  });
+
+  it("keeps a bare collection member's basename when it has no directory below the root", async () => {
+    const status = {
+      changeName: "demo",
+      schemaName: "spec-driven",
+      artifacts: [{ id: "specs", outputPath: "specs/**/*.md", status: "in-progress" }],
+      artifactPaths: {
+        specs: {
+          outputPath: "specs/**/*.md",
+          resolvedOutputPath: "/proj/openspec/changes/demo/specs/**/*.md",
+          existingOutputPaths: ["/proj/openspec/changes/demo/specs/overview.md"],
+        },
+      },
+    };
+    const deps: AdapterDeps = {
+      run: runFor({ status: { stdout: JSON.stringify(status) } }),
+      readScoped: readerFor({ "/proj/openspec/changes/demo/specs/overview.md": "# o" }),
+      projectRoot: PROJECT_ROOT,
+      openspecRoot: OPENSPEC_ROOT,
+    };
+
+    const { artifacts } = await resolveArtifactsFromBinary(deps, "demo");
+
+    expect(artifacts[0]?.files.map((f) => f.label)).toEqual(["overview"]);
+  });
+
+  it("degrades to `collection: false` when the output pattern is missing, without throwing", async () => {
+    const status = {
+      changeName: "demo",
+      schemaName: "spec-driven",
+      artifacts: [{ id: "specs", status: "in-progress" }],
+      artifactPaths: {
+        specs: { existingOutputPaths: ["/proj/openspec/changes/demo/specs/a/spec.md"] },
+      },
+    };
+    const deps: AdapterDeps = {
+      run: runFor({ status: { stdout: JSON.stringify(status) } }),
+      readScoped: readerFor({ "/proj/openspec/changes/demo/specs/a/spec.md": "# a" }),
+      projectRoot: PROJECT_ROOT,
+      openspecRoot: OPENSPEC_ROOT,
+    };
+
+    const { artifacts } = await resolveArtifactsFromBinary(deps, "demo");
+
+    expect(artifacts[0]?.collection).toBe(false);
+  });
+
   it("resolves to no artifacts when the status body omits `artifacts`, without throwing", async () => {
     const deps: AdapterDeps = {
       run: runFor({ status: { stdout: JSON.stringify({ changeName: "demo" }) } }),
@@ -292,6 +406,23 @@ describe("resolveArtifactsFromFilesystem", () => {
     expect(artifacts[0]?.files[0]?.label).toBe("proposal");
   });
 
+  it("marks a `<id>/`-directory artifact as a collection and a top-level `<id>.md` as singular", async () => {
+    const { artifacts } = await resolveArtifactsFromFilesystem(deps, changeDir);
+    const byId = new Map(artifacts.map((a) => [a.id, a.collection]));
+
+    expect(byId.get("proposal")).toBe(false);
+    expect(byId.get("design")).toBe(false);
+    expect(byId.get("tasks")).toBe(false);
+    expect(byId.get("specs")).toBe(true);
+  });
+
+  it("labels a lone archived collection member by its capability directory", async () => {
+    const { artifacts } = await resolveArtifactsFromFilesystem(deps, changeDir);
+    const specsArtifact = artifacts.find((a) => a.id === "specs");
+
+    expect(specsArtifact?.files.map((f) => f.label)).toEqual(["app-shell"]);
+  });
+
   it("labels a colliding-basename artifact (spec.md across folders) by the parent folder,\
  matching the binary source's derivation for the same file set", async () => {
     await mkdir(join(changeDir, "specs", "another-cap"), { recursive: true });
@@ -308,6 +439,8 @@ describe("resolveArtifactsFromFilesystem", () => {
       artifacts: [{ id: "specs", outputPath: "specs/**/*.md", status: "in-progress" }],
       artifactPaths: {
         specs: {
+          outputPath: "specs/**/*.md",
+          resolvedOutputPath: join(changeDir, "specs", "**", "*.md"),
           existingOutputPaths: [
             join(changeDir, "specs", "app-shell", "spec.md"),
             join(changeDir, "specs", "another-cap", "spec.md"),

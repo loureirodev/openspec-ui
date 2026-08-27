@@ -143,7 +143,7 @@ function ArtifactBody({ artifact }: { artifact: ResolvedArtifact }) {
 
   const body = (
     <div className="change-detail__file-body">
-      {artifact.files.length > 1 && (
+      {(artifact.collection || artifact.files.length > 1) && (
         <nav className="side-nav change-detail__file-rail">
           <div
             className="side-nav__items"

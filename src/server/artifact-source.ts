@@ -42,6 +42,12 @@ export interface ArtifactFile {
 export interface ResolvedArtifact {
   id: string;
   status?: string;
+  /**
+   * Whether this artifact's schema permits many files; a given change may still have one.
+   * A `specs` artifact (`specs/**\/*.md`) is a collection even when a single capability
+   * matched; `proposal` / `design` / `tasks` (literal paths) are not.
+   */
+  collection: boolean;
   /** The ids of dependency artifacts still missing; present only for a `blocked` binary artifact. */
   missingDeps?: string[];
   /** Set by the archived detail route on spec-delta artifacts, to frame them as history. */
@@ -88,6 +94,56 @@ export interface ChangeRef {
 /** An {@link ArtifactFile} before its `label` is derived from its artifact's sibling files. */
 type UnlabeledFile = Omit<ArtifactFile, "label">;
 
+/**
+ * How an artifact's file set should be labelled. For a `collection` artifact a member's own
+ * basename is structural (`spec.md` for every capability), so it is dropped as a label
+ * candidate whenever the file sits in a subdirectory *below* `artifactRoot` — labelling then
+ * starts at the distinguishing parent directory. `artifactRoot` is the artifact's absolute
+ * root directory (`<changeDir>/specs` for `specs/**\/*.md`, `<changeDir>/<id>` for the
+ * filesystem source); an empty string means "unknown", and structural detection is skipped.
+ */
+interface LabelContext {
+  collection: boolean;
+  artifactRoot: string;
+}
+
+const GLOB_METACHAR = /[*?[]/;
+
+/**
+ * The leading glob-free directory of an output pattern — its resolved form is the artifact's
+ * root directory, e.g. `/…/change/specs` from `/…/change/specs/**\/*.md`, `specs` from
+ * `specs/**\/*.md`. Works on absolute and relative patterns alike.
+ */
+function literalRootDir(pattern: string): string {
+  const globAt = pattern.search(GLOB_METACHAR);
+  const literal = globAt === -1 ? pattern : pattern.slice(0, globAt);
+  return literal.endsWith("/") ? literal.slice(0, -1) : literal.slice(0, literal.lastIndexOf("/"));
+}
+
+/**
+ * The ordered label candidates for one file, most-preferred first: the distinguishing-segment
+ * rule tries each in turn, advancing to the next only while the current one collides with a
+ * sibling. Normally that is `[basename, parent, grandparent/parent, …]`; for a collection
+ * member whose basename is structural it is `[parent, grandparent/parent, …]` with the file's
+ * (unique) relative path appended as a guaranteed-distinct last resort.
+ */
+function labelCandidates(file: UnlabeledFile, context: LabelContext | undefined): string[] {
+  const parsed = parse(file.relPath);
+  const reversed = parsed.dir.split(sep).filter(Boolean).reverse();
+  const escalations = reversed.map((_, depth) =>
+    reversed
+      .slice(0, depth + 1)
+      .reverse()
+      .join("/"),
+  );
+
+  const belowRoot =
+    context?.collection && context.artifactRoot ? relative(context.artifactRoot, file.path) : "";
+  const basenameIsStructural =
+    belowRoot !== "" && !belowRoot.startsWith("..") && belowRoot.includes(sep);
+  return basenameIsStructural ? [...escalations, file.relPath] : [parsed.name, ...escalations];
+}
+
 /** Reads one file into the uniform shape through the scoped reader, `label` still pending. */
 async function toArtifactFile(deps: AdapterDeps, path: string): Promise<UnlabeledFile> {
   return {
@@ -114,32 +170,26 @@ function collidingLabels(labels: string[]): Set<string> {
  * keeps escalating one directory level at a time until it distinguishes the file, joining the
  * escalated segments (never reintroducing the basename). Computed once, over the whole set, so
  * every file's uniqueness is judged against the same siblings — schema-agnostic, no artifact-
- * or filename-specific logic. Termination is guaranteed because two files never share the same
- * `relPath`, so the full path (the last thing tried) is always unique.
+ * or filename-specific logic. Termination is guaranteed because each file's candidate list ends
+ * in its (unique) relative path.
+ *
+ * For a `collection` artifact (see {@link LabelContext}) a member's structural basename is
+ * dropped from the candidate list, so a lone `specs/<cap>/spec.md` labels as `<cap>` — the same
+ * *kind* of label the multi-file case already produces — rather than `spec`.
  */
-function withLabels(files: UnlabeledFile[]): ArtifactFile[] {
-  const parsed = files.map((file) => parse(file.relPath));
-  // Directory segments closest-to-farthest (index 0 = immediate parent), consumed one at a
-  // time to escalate a colliding label — see the doc comment above.
-  const dirSegments = parsed.map((p) => p.dir.split(sep).filter(Boolean).reverse());
-
-  let labels = parsed.map((p) => p.name);
-  let depth = 0;
+function withLabels(files: UnlabeledFile[], context?: LabelContext): ArtifactFile[] {
+  const ladders = files.map((file) => labelCandidates(file, context));
+  let labels = ladders.map((ladder) => ladder[0] ?? "");
   let colliding = collidingLabels(labels);
-  while (colliding.size > 0) {
+  for (let depth = 1; colliding.size > 0; depth++) {
     let escalatedAny = false;
     labels = labels.map((label, index) => {
-      if (!colliding.has(label)) return label;
-      const segs = dirSegments[index] ?? [];
-      if (depth >= segs.length) return label; // ran out of directory context — leave as-is
+      const ladder = ladders[index] ?? [];
+      if (!colliding.has(label) || depth >= ladder.length) return label;
       escalatedAny = true;
-      return segs
-        .slice(0, depth + 1)
-        .reverse()
-        .join("/");
+      return ladder[depth] ?? label;
     });
     if (!escalatedAny) break; // every still-colliding file has no more context to add
-    depth++;
     colliding = collidingLabels(labels);
   }
 
@@ -161,10 +211,14 @@ function withLabels(files: UnlabeledFile[]): ArtifactFile[] {
 async function readArtifactFiles(
   deps: AdapterDeps,
   paths: string[],
+  context?: LabelContext,
 ): Promise<Pick<ResolvedArtifact, "files" | "error">> {
   try {
     return {
-      files: withLabels(await Promise.all(paths.map((path) => toArtifactFile(deps, path)))),
+      files: withLabels(
+        await Promise.all(paths.map((path) => toArtifactFile(deps, path))),
+        context,
+      ),
     };
   } catch (error) {
     return { files: [], error: toStructuredError(error) };
@@ -188,12 +242,19 @@ export async function resolveArtifactsFromBinary(
   // Defensive against a status body that omits `artifacts` (version drift, partial output):
   // resolve to no artifacts rather than throwing a `not iterable` TypeError to the caller.
   for (const artifact of status.artifacts ?? []) {
-    const existing = artifactPaths[artifact.id]?.existingOutputPaths ?? [];
+    const paths = artifactPaths[artifact.id];
+    // The schema output pattern is a glob (`specs/**\/*.md`) for a collection artifact and a
+    // literal path (`design.md`) for a singular one; a missing pattern degrades to singular.
+    const collection = GLOB_METACHAR.test(paths?.outputPath ?? "");
     artifacts.push({
       id: artifact.id,
       status: artifact.status,
+      collection,
       missingDeps: artifact.missingDeps,
-      ...(await readArtifactFiles(deps, existing)),
+      ...(await readArtifactFiles(deps, paths?.existingOutputPaths ?? [], {
+        collection,
+        artifactRoot: literalRootDir(paths?.resolvedOutputPath ?? ""),
+      })),
     });
   }
   return { artifacts, nextSteps: status.nextSteps };
@@ -205,19 +266,24 @@ export async function resolveArtifactsFromBinary(
  * `<id>.md`, and/or an `<id>/` directory whose markdown belongs to that artifact (e.g.
  * `specs/**\/*.md`). The trailing separator on the directory prefix keeps `spec` from also
  * matching a sibling `specs/`. Selected paths are recorded so leftovers can be surfaced.
+ *
+ * `collection` reports whether the files came from the `<id>/` directory (a collection, e.g.
+ * archived `specs/<cap>/spec.md`) rather than the direct `<id>.md` file (singular) — the
+ * filesystem-source counterpart of the binary source's glob-pattern check.
  */
 function markdownForArtifactId(
   changeDir: string,
   id: string,
   allMarkdown: string[],
   consumed: Set<string>,
-): string[] {
+): { paths: string[]; collection: boolean } {
   const directFile = join(changeDir, `${id}.md`);
   const dirPrefix = join(changeDir, id) + sep;
 
-  const selected = allMarkdown.filter((path) => path === directFile || path.startsWith(dirPrefix));
-  for (const path of selected) consumed.add(path);
-  return selected;
+  const paths = allMarkdown.filter((path) => path === directFile || path.startsWith(dirPrefix));
+  for (const path of paths) consumed.add(path);
+  const collection = paths.length > 0 && !paths.includes(directFile);
+  return { paths, collection };
 }
 
 /**
@@ -244,14 +310,23 @@ export async function resolveArtifactsFromFilesystem(
   for (const id of order) {
     // `status` and `missingDeps` are intentionally omitted: neither was persisted for an
     // archived change.
-    const paths = markdownForArtifactId(changeDir, id, allMarkdown, consumed);
-    artifacts.push({ id, ...(await readArtifactFiles(deps, paths)) });
+    const { paths, collection } = markdownForArtifactId(changeDir, id, allMarkdown, consumed);
+    artifacts.push({
+      id,
+      collection,
+      ...(await readArtifactFiles(deps, paths, {
+        collection,
+        artifactRoot: join(changeDir, id),
+      })),
+    });
   }
 
   const leftovers = allMarkdown.filter((path) => !consumed.has(path));
   if (leftovers.length > 0) {
+    // A leftovers bucket, not a schema artifact — never a collection.
     artifacts.push({
       id: UNATTRIBUTED_ARTIFACT_ID,
+      collection: false,
       ...(await readArtifactFiles(deps, leftovers)),
     });
   }
