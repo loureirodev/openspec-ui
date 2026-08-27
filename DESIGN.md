@@ -269,7 +269,7 @@ The app also ships a favicon (`src/client/public/favicon.svg`, `favicon-16.svg`,
   named narrowing utility, `.view-width--text` (`820px`, also centred), instead of hugging the
   left edge of the wider default.
 
-  Within a wide view, a markdown reading column (`.markdown-viewer`) still caps at `680px`, so
+  Within a wide view, a markdown reading column (`.markdown-viewer`) still caps at `760px`, so
   prose never stretches to the full 1120px even where the page around it is wide.
 - **Hairlines over cards.** List rows and sidebar items are separated by a `1px solid --hair`
   rule (typically `border-bottom`), not a full bordered box. `--panel` is reserved for exactly
@@ -372,7 +372,7 @@ and no border box of its own.
 **Pairs flow, they do not align to a column.** Each `dt`/`dd` is grouped in a `div` (valid HTML5
 inside a `dl`), and those groups wrap as flex items. A fixed label column would have to be sized
 to the longest key — that is a layout that must know its content in advance. Flowing measures
-nothing: short pairs share a line, a long value wraps within the 680px reading measure with its
+nothing: short pairs share a line, a long value wraps within the 760px reading measure with its
 key still adjacent to the start of it, and an unbreakable token breaks rather than widening the
 page. Nothing is ever truncated or elided; this is a read-only view of a file on disk, and
 hiding content to fit would misreport the source.
@@ -423,4 +423,4 @@ this lands within a hair of the previous fixed-size rendering (14px / 16px = 0.8
 heading, code keeps its `--track` ground, radius and horizontal padding, but drops its
 **vertical** padding (which at heading line-height made wrapped heading lines collide) and sizes
 at `0.92em` relative to the heading, inheriting its weight. `overflow-wrap: break-word` lets a
-long identifier wrap inside the 680px reading measure instead of widening the page.
+long identifier wrap inside the 760px reading measure instead of widening the page.

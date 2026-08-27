@@ -1,7 +1,7 @@
 /* Markdown viewer: reading typography */
 
 .markdown-viewer {
-  max-width: 680px;
+  max-width: 760px;
   line-height: var(--line-height-relaxed);
   margin: 0 auto;
 }
