@@ -154,7 +154,10 @@ Each replaces the rules it used to sit alongside, rather than adding a new one b
 rule, a 1px border and a ground both derived from the tone with `color-mix(in oklch, …)`, a
 tone-coloured icon and title, and **body text in `--text`** — the tone colours the rule, icon
 and title only, so a long message stays legible rather than rendering wall-to-wall in the tone
-colour. `--panel` stays reserved for the scenario block; a callout's ground is a tone mix, not
+colour. The icon is one of the `*-square` line icons from `references/icons` — `info-square`,
+`danger-square` and `check-square` — sharing the same rounded-square frame (with the same
+top-right gap as `StatusIcon`'s ring) and drawn from `currentColor` so it always matches the
+title. `--panel` stays reserved for the scenario block; a callout's ground is a tone mix, not
 `--panel`. `role="alert"` is set only for the danger tone. This is what a failed change, an
 unreadable artifact, a spec validation error and a partial-load warning all render as now —
 see "Reversed rules" below for what this replaces.

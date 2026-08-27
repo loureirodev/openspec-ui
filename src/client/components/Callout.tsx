@@ -9,44 +9,49 @@ const TONE_CLASS: Record<CalloutTone, string> = {
   success: styles["callout--success"] ?? "",
 };
 
+/**
+ * The rounded-square frame shared by all three tone glyphs — a hand-picked line icon from
+ * `references/icons` (the `*-square` family), with the same small gap at the top-right that
+ * `StatusIcon`'s ring has.
+ */
+const SQUARE_FRAME =
+  "M22 12c0 4.714 0 7.071-1.465 8.535C19.072 22 16.714 22 12 22s-7.071 0-8.536-1.465C2 19.072 2 16.714 2 12s0-7.071 1.464-8.536C4.93 2 7.286 2 12 2s7.071 0 8.535 1.464c.974.974 1.3 2.343 1.41 4.536";
+
 /** A small tone-coloured glyph, drawn from `currentColor` so it always matches the title. */
 function ToneIcon({ tone }: { tone: CalloutTone }) {
-  switch (tone) {
-    case "danger":
-      return (
-        <svg width={14} height={14} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-          <circle cx={8} cy={8} r={6} fill="none" stroke="currentColor" strokeWidth={1.5} />
-          <path
-            d="M5.5 5.5 L10.5 10.5 M10.5 5.5 L5.5 10.5"
-            stroke="currentColor"
-            strokeWidth={1.5}
-            strokeLinecap="round"
-          />
-        </svg>
-      );
-    case "success":
-      return (
-        <svg width={14} height={14} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-          <circle cx={8} cy={8} r={6} fill="currentColor" />
-          <path
-            d="M5 8.2 L7 10.2 L11 5.8"
-            fill="none"
-            stroke="var(--bg)"
-            strokeWidth={1.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      );
-    default:
-      return (
-        <svg width={14} height={14} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-          <circle cx={8} cy={8} r={6} fill="none" stroke="currentColor" strokeWidth={1.5} />
-          <line x1={8} y1={7} x2={8} y2={11.5} stroke="currentColor" strokeWidth={1.5} />
-          <circle cx={8} cy={4.6} r={0.9} fill="currentColor" />
-        </svg>
-      );
-  }
+  return (
+    <svg
+      width={20}
+      height={20}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {tone === "danger" && (
+        <>
+          <path d="M12 7V13" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+          <circle cx={12} cy={16} r={1} fill="currentColor" />
+        </>
+      )}
+      {tone === "success" && (
+        <path
+          d="m8.5 12.5 2 2 5-5"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+      {tone === "info" && (
+        <>
+          <path d="M12 17v-6" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+          <circle cx={12} cy={8} r={1} fill="currentColor" />
+        </>
+      )}
+      <path d={SQUARE_FRAME} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    </svg>
+  );
 }
 
 export interface CalloutProps {
