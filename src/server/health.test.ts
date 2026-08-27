@@ -4,6 +4,8 @@ import { checkHealth, type HealthDependencies } from "./health.js";
 
 const BINARY_PATH = "/usr/local/bin/openspec";
 
+const PROJECT_ROOT = "/work/my-project";
+
 interface StubEnvironment {
   /** The absolute path `openspec` resolves to, or `null` when it is absent. */
   binaryPath?: string | null;
@@ -38,7 +40,7 @@ function stubEnvironment(environment: StubEnvironment): HealthDependencies & { c
         const source = isProject ? "nearest" : "implicit";
         return {
           exitCode: 0,
-          stdout: JSON.stringify({ changes: [], root: { path: "/p", source } }),
+          stdout: JSON.stringify({ changes: [], root: { path: PROJECT_ROOT, source } }),
           stderr: "",
         };
       }
@@ -48,17 +50,18 @@ function stubEnvironment(environment: StubEnvironment): HealthDependencies & { c
 }
 
 describe("checkHealth", () => {
-  it("reports a healthy environment with the resolved path and version", async () => {
+  it("reports a healthy environment with the resolved path, version and project root", async () => {
     const result = await checkHealth(stubEnvironment({ version: "2.1.3" }));
 
     expect(result).toEqual({
       status: "ok",
       resolvedBinaryPath: BINARY_PATH,
       version: "2.1.3",
+      projectRoot: PROJECT_ROOT,
     });
   });
 
-  it("reports the binary check when no binary resolves, without a version", async () => {
+  it("reports the binary check when no binary resolves, without a version or project root", async () => {
     const dependencies = stubEnvironment({ binaryPath: null });
     const result = await checkHealth(dependencies);
 
@@ -66,6 +69,7 @@ describe("checkHealth", () => {
     expect(result.check).toBe("binary");
     expect(result.version).toBeUndefined();
     expect(result.resolvedBinaryPath).toBeUndefined();
+    expect(result.projectRoot).toBeUndefined();
     expect(result.remedy).toBeTruthy();
     expect(dependencies.calls).toEqual([]);
   });
@@ -114,6 +118,7 @@ describe("checkHealth", () => {
     expect(result.check).toBe("project");
     expect(result.resolvedBinaryPath).toBe(BINARY_PATH);
     expect(result.version).toBe(MINIMUM_OPENSPEC_VERSION);
+    expect(result.projectRoot).toBeUndefined();
     expect(dependencies.calls).toEqual([["--version"], ["list", "--json"]]);
   });
 
@@ -138,6 +143,7 @@ describe("checkHealth", () => {
       status: "ok",
       resolvedBinaryPath: BINARY_PATH,
       version: "1.7.0-rc.1",
+      projectRoot: PROJECT_ROOT,
     });
   });
 

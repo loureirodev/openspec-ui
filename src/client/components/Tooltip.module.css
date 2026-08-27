@@ -56,6 +56,18 @@
   left: 1.25rem;
 }
 
+.end > .bubble {
+  left: auto;
+  right: 0;
+  translate: 0 -4px;
+  transform-origin: top right;
+}
+
+.end > .bubble::before {
+  left: auto;
+  right: 1.25rem;
+}
+
 .name {
   font-family: var(--font-body);
   font-weight: 600;
@@ -78,7 +90,9 @@
 }
 
 .start.wrapper:hover:not(:has(.wrapper:hover)) > .bubble,
-.start.wrapper:has(:focus-visible):not(:has(.wrapper:has(:focus-visible))) > .bubble {
+.start.wrapper:has(:focus-visible):not(:has(.wrapper:has(:focus-visible))) > .bubble,
+.end.wrapper:hover:not(:has(.wrapper:hover)) > .bubble,
+.end.wrapper:has(:focus-visible):not(:has(.wrapper:has(:focus-visible))) > .bubble {
   translate: 0 0;
 }
 

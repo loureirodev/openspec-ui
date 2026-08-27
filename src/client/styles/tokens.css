@@ -57,8 +57,15 @@
   background-color: var(--bg);
 }
 
+/* The dark palette. Applied two ways, and the two blocks MUST stay in sync (see the twin
+   block below):
+   - by preference, when the viewer's environment asks for dark and no explicit override
+     forces light — this is the default the app ships with;
+   - by the theme toggle, which sets `data-theme` on <html> for the session (see useTheme).
+   `:not([data-theme="light"])` is what lets a forced *light* theme win under a dark
+   environment; a forced *dark* theme is handled by the `[data-theme="dark"]` block. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: oklch(20% 0.012 80);
     --panel: oklch(24% 0.012 80);
     --track: oklch(30% 0.012 80);
@@ -76,4 +83,27 @@
 
     --renamed: oklch(74% 0.14 300);
   }
+}
+
+/* Twin of the dark palette above — MUST stay in sync with it. This block forces dark
+   regardless of the environment's preference, for a viewer who toggled to it. The bare
+   `:root` light palette above already serves as the forced-light case, so there is no
+   `[data-theme="light"]` block. */
+:root[data-theme="dark"] {
+  --bg: oklch(20% 0.012 80);
+  --panel: oklch(24% 0.012 80);
+  --track: oklch(30% 0.012 80);
+  --hair: oklch(28% 0.012 80);
+  --text: oklch(94% 0.008 80);
+  --muted: oklch(72% 0.011 80);
+  --faint: oklch(56% 0.012 80);
+
+  --accent: oklch(74% 0.1 205);
+  --accent-tint: oklch(33% 0.06 205);
+
+  --success: oklch(76% 0.14 150);
+  --warning: oklch(80% 0.13 85);
+  --danger: oklch(72% 0.16 25);
+
+  --renamed: oklch(74% 0.14 300);
 }

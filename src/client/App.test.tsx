@@ -12,6 +12,7 @@ const HEALTHY: HealthResponse = {
   status: "ok",
   resolvedBinaryPath: "/usr/local/bin/openspec",
   version: MINIMUM_OPENSPEC_VERSION,
+  projectRoot: "/home/dani/projects/openspec-ui",
 };
 
 /** The path a `fetch` call was made with, whether given a string or a `Request`. */
@@ -90,6 +91,35 @@ describe("the brand", () => {
 
     expect(screen.getAllByRole("img", { name: "OpenSpec UI" })).toHaveLength(1);
     expect(screen.queryByText("OpenSpec", { selector: ".app__brand" })).not.toBeInTheDocument();
+  });
+});
+
+describe("the top-bar tools", () => {
+  it("names the launched project's folder when the environment is healthy", async () => {
+    mockHealth(HEALTHY);
+    renderApp();
+    await screen.findByRole("heading", { name: "Changes" });
+
+    const name = screen.getByRole("button", { name: /copy path/i });
+    expect(name).toHaveTextContent("openspec-ui");
+    expect(name).toHaveAccessibleName(/\/home\/dani\/projects\/openspec-ui/);
+  });
+
+  it("hides the project name on the diagnostics screen", async () => {
+    mockHealth({ status: "error", check: "binary", message: "gone", remedy: "install it" });
+    renderApp();
+    await screen.findByRole("heading", { level: 1 });
+
+    expect(screen.queryByRole("button", { name: /copy path/i })).not.toBeInTheDocument();
+  });
+
+  it("offers a theme toggle alongside refresh", async () => {
+    mockHealth(HEALTHY);
+    renderApp();
+    await screen.findByRole("heading", { name: "Changes" });
+
+    expect(screen.getByRole("button", { name: /switch to .* theme/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /refresh/i })).toBeInTheDocument();
   });
 });
 

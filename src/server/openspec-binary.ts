@@ -107,23 +107,26 @@ export function isSupportedVersion(version: string): boolean {
 }
 
 /**
- * Whether the working directory resolves to an OpenSpec project. The binary is the
- * sole authority; the filesystem is never inspected for an `openspec/` directory.
+ * The absolute project root the binary resolves for the working directory, or `null` when
+ * the directory is not an OpenSpec project. The binary is the sole authority; the filesystem
+ * is never inspected for an `openspec/` directory.
  *
- * A zero exit is necessary but no longer sufficient. Since 1.6.0, `list --json`
- * succeeds even outside a project by falling back to an `implicit` root anchored at
- * the working directory, so we inspect the reported `root.source`: only a resolved
- * root (`nearest`, `declared`, `store`) counts as a project; `implicit` does not.
+ * A zero exit is necessary but no longer sufficient. Since 1.6.0, `list --json` succeeds even
+ * outside a project by falling back to an `implicit` root anchored at the working directory,
+ * so we inspect the reported `root.source`: only a resolved root (`nearest`, `declared`,
+ * `store`) counts as a project; `implicit` does not. Callers that only need a yes/no answer
+ * check the result against `null`.
  */
-export async function isOpenSpecProject(run: RunOpenSpec): Promise<boolean> {
+export async function detectProjectRoot(run: RunOpenSpec): Promise<string | null> {
   const result = await run(["list", "--json"]);
-  if (result.exitCode !== 0) return false;
+  if (result.exitCode !== 0) return null;
 
   try {
     // Parsed through the shared wrapper so the project check and root resolution read the
     // same typed `root`, rather than each casting the body to its own inline shape.
-    return isResolvedRoot(parseCommandJson<ChangesList>(result, "list --json").root);
+    const { root } = parseCommandJson<ChangesList>(result, "list --json");
+    return isResolvedRoot(root) ? root.path : null;
   } catch {
-    return false;
+    return null;
   }
 }

@@ -28,6 +28,11 @@ export function humanizeName(name: string): string {
   return humanize(name);
 }
 
+export function basename(path: string): string {
+  const segments = path.split(/[/\\]+/).filter(Boolean);
+  return segments.at(-1) ?? path;
+}
+
 /**
  * Turns a server-derived file label (a basename, or an escalated `dir/basename` segment) into
  * a readable form, the same way `humanizeName` reads a change name.

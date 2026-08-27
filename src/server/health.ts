@@ -4,8 +4,8 @@ import type { ResolveBinaryPath, RunOpenSpec } from "./openspec-binary.js";
 import {
   resolveBinaryPath as defaultResolveBinaryPath,
   runOpenSpec as defaultRunOpenSpec,
+  detectProjectRoot,
   detectVersion,
-  isOpenSpecProject,
   isSupportedVersion,
   OPENSPEC_BINARY,
   OPENSPEC_PACKAGE,
@@ -75,7 +75,8 @@ export async function checkHealth(
     };
   }
 
-  if (!(await isOpenSpecProject(run))) {
+  const projectRoot = await detectProjectRoot(run);
+  if (projectRoot === null) {
     return {
       status: "error",
       check: "project",
@@ -88,5 +89,5 @@ export async function checkHealth(
     };
   }
 
-  return { status: "ok", resolvedBinaryPath, version };
+  return { status: "ok", resolvedBinaryPath, version, projectRoot };
 }

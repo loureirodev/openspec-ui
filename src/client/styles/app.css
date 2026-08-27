@@ -54,8 +54,43 @@
   font-weight: 600;
 }
 
-.refresh-control {
+.app__header-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
   margin-left: auto;
+  min-width: 0;
+}
+
+.project-name {
+  min-width: 0;
+  max-width: 22ch;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.project-name:hover {
+  color: var(--accent);
+}
+
+.project-name:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 640px) {
+  .project-name {
+    max-width: 10ch;
+  }
 }
 
 /* `.app__main` is the shell's own default width, not a per-page override: 1120px is what a

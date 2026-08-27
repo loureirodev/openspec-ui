@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { formatRelativeDate, humanizeLabel, humanizeName } from "./format.js";
+import { basename, formatRelativeDate, humanizeLabel, humanizeName } from "./format.js";
+
+describe("basename", () => {
+  it("takes the last segment of a POSIX path", () => {
+    expect(basename("/home/dani/projects/openspec-ui")).toBe("openspec-ui");
+  });
+
+  it("ignores a trailing slash", () => {
+    expect(basename("/home/dani/projects/openspec-ui/")).toBe("openspec-ui");
+  });
+
+  it("takes the last segment of a Windows path", () => {
+    expect(basename("C:\\work\\my-project")).toBe("my-project");
+  });
+
+  it("returns the input when there is no segment to take", () => {
+    expect(basename("/")).toBe("/");
+  });
+});
 
 describe("humanizeName / humanizeLabel", () => {
   it("title-cases a plain kebab-case name", () => {

@@ -9,8 +9,9 @@ changes; keep it token/role-level, not a line-by-line changelog.
 The identity is "paper + ink": a warm cream reading surface, warm near-black ink, and a single
 cold-hue interactive accent (teal) — like the one coloured stamp on a printed page. The accent
 is teal rather than a plain blue so it sits close to complementary with the terracotta brand
-mark: the one warm and the one cold hue in the UI harmonize instead of merely coexisting. Dark
-theme follows `prefers-color-scheme` only; there is no manual toggle.
+mark: the one warm and the one cold hue in the UI harmonize instead of merely coexisting. The
+theme follows `prefers-color-scheme` on every load; a top-bar toggle overrides it for the
+session only (see "Theme resolution" below) — nothing is persisted.
 
 ## Colour tokens
 
@@ -47,6 +48,26 @@ This is a rule, not a convention: `--brand` sits only ~16° from `--danger` in h
 and chroma too — a status use of `--brand` would read as a plausible fourth error colour. The
 mark is the only thing permitted to reach for it, and it sits in the top bar, where no status
 is ever reported, so the two never appear in the same context.
+
+### Theme resolution
+
+`tokens.css` carries one light palette (bare `:root`) and one dark palette, applied two ways:
+
+- `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { … } }` — the
+  default: dark when the environment asks for it and nothing forces light.
+- `:root[data-theme="dark"] { … }` — a twin block that forces dark regardless of the
+  environment. **The two dark blocks are duplicated and MUST be kept in sync.**
+
+The bare `:root` light palette doubles as the forced-light case, so there is no
+`[data-theme="light"]` palette block — only the `:not([data-theme="light"])` guard that lets
+a forced light theme win under a dark environment.
+
+`data-theme` is set on `<html>` by `useTheme` (`src/client/lib/use-theme.ts`), and only after
+the top-bar toggle (`ThemeToggle`) is used. It is **never persisted** — every load starts
+from `prefers-color-scheme`, because the CLI's port-fallback means the origin is not stable
+and a per-origin store could not be relied on. Before the toggle is touched, no attribute is
+set and the page tracks the environment live. Because nothing is restored on load, no
+pre-paint script is needed: the media query paints the correct first frame.
 
 ## Typography
 
@@ -160,9 +181,13 @@ sole copy of anything: the control it attaches to always exposes the same conten
 own accessible name.
 
 The bubble anchors *below* its trigger by default, with a caret (a rotated square) pointing
-back at it. A `start` prop anchors it to the trigger's left edge instead of centring it — used
-on wide, full-width triggers (a changes/archived-list row, a side-nav item) where a centred
-bubble would either clip against the viewport or land far from the content it annotates.
+back at it. A `start` prop anchors it to the trigger's left edge and grows it rightward —
+used on wide, full-width triggers (a changes/archived-list row, a side-nav item) where a
+centred bubble would either clip against the viewport or land far from the content it
+annotates. An `end` prop is its mirror: anchored to the trigger's right edge, growing
+leftward — used on a control near the viewport's right edge (the top bar's project name)
+where a centred or left-anchored bubble would clip. The caret stays pinned to the trigger
+whichever way the bubble grows.
 Content is plain text by default; where a tooltip carries both an identity and a supplementary
 state (an artifact tab's name and status), it uses the two-tier `TooltipName` (bold, body font)
 over `TooltipMeta` (uppercase mono, small, 72% opacity) — the same `TooltipMeta` treatment
@@ -261,11 +286,16 @@ The app also ships a favicon (`src/client/public/favicon.svg`, `favicon-16.svg`,
   off by a hard rule. The active nav item is `--accent` text on an `--accent-tint` background;
   inactive items are `--muted`. The brand is a lockup — `BrandIcon` then `BrandWordmark`,
   inlined SVG components resolving `currentColor` (ink) and `--brand` (the mark's accent) — not
-  text; see "Brand mark" below.
+  text; see "Brand mark" below. The right edge holds `.app__header-tools`, one
+  `margin-left: auto` cluster carrying the utilities in a fixed order — the launched project's
+  folder name (`ProjectName`, shown only when health is `ok`: a button that copies the full
+  path on click, its label truncating with the full path in the tooltip and accessible name),
+  then `ThemeToggle`, then `RefreshControl`. A utility added later joins this cluster rather
+  than positioning itself.
 - **Stylesheet split.** `src/client/styles.css` (a single file) is now `src/client/styles/`,
   imported once from `index.css` (itself the sole import in `main.tsx`):
   - `tokens.css` — the `:root` (+ dark-mode) token layer: colour roles, font-family roles,
-    spacing/radius primitives.
+    spacing/radius primitives. See "Theme resolution" for the light/dark/`data-theme` blocks.
   - `base.css` — reset, base typography wiring, and shared building blocks used across pages
     (status badges, the inferred-schema label, heading font rules, the form-control and
     icon-button vocabulary below, the `:focus-visible` rule — which also covers list rows and
@@ -273,7 +303,8 @@ The app also ships a favicon (`src/client/public/favicon.svg`, `favicon-16.svg`,
   - `markdown.css` — `MarkdownViewer` output: reading typography, task/scenario/delta
     semantics, and the `highlight.js` theme. Global by necessity, since `react-markdown` emits
     plain HTML this can't scope to a module.
-  - `app.css` — the top bar (brand lockup, nav, refresh control) and the per-view width utilities.
+  - `app.css` — the top bar (brand lockup, nav, and the `.app__header-tools` cluster: project
+    name, theme toggle, refresh control) and the per-view width utilities.
   - `changes.css` — the changes list, change detail, and archived list.
   - `specs.css` — the specs browser: sidebar and spec detail.
 
@@ -368,7 +399,8 @@ shift sideways. Any future active state that changes font-weight owes the same t
 
 ## Non-goals (for now)
 
-- No manual light/dark toggle. Theme follows `prefers-color-scheme` only.
+- No **persisted** theme preference. The top-bar toggle overrides the theme for the session
+  only; every load re-derives it from `prefers-color-scheme` (see "Theme resolution").
 - No Tailwind or CSS-in-JS — plain CSS custom properties and (for new components) CSS Modules.
 - No self-hosted fonts — the Google Fonts CDN `<link>` is acceptable for a local dev tool.
 - No elevation vocabulary. The `Tooltip` above is the single, deliberate shadow exception; every

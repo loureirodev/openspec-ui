@@ -32,6 +32,7 @@ describe("GET /api/health", () => {
       status: "ok",
       resolvedBinaryPath: "/usr/local/bin/openspec",
       version: "1.6.0",
+      projectRoot: "/work/my-project",
     };
     const response = await appWithHealth(healthy).request("/api/health");
 

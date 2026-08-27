@@ -14,4 +14,5 @@ export interface HealthResponse {
   resolvedBinaryPath?: string;
   /** The version the binary reported, whenever it could be obtained. */
   version?: string;
+  projectRoot?: string;
 }

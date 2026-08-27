@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CommandResult, RunOpenSpec } from "./openspec-binary.js";
-import { detectVersion, isOpenSpecProject, isSupportedVersion } from "./openspec-binary.js";
+import { detectProjectRoot, detectVersion, isSupportedVersion } from "./openspec-binary.js";
 
 function stubRun(result: Partial<CommandResult>): RunOpenSpec {
   return async () => ({ exitCode: 0, stdout: "", stderr: "", ...result });
@@ -52,38 +52,38 @@ describe("detectVersion", () => {
   });
 });
 
-describe("isOpenSpecProject", () => {
-  const listJson = (source: string) =>
-    JSON.stringify({ changes: [], root: { path: "/p", source } });
+describe("detectProjectRoot", () => {
+  const listJson = (source: string, path = "/p") =>
+    JSON.stringify({ changes: [], root: { path, source } });
 
-  it("treats a resolved root as a project", async () => {
-    expect(await isOpenSpecProject(stubRun({ exitCode: 0, stdout: listJson("nearest") }))).toBe(
-      true,
+  it("returns the path of a resolved root", async () => {
+    expect(
+      await detectProjectRoot(stubRun({ exitCode: 0, stdout: listJson("nearest", "/work/proj") })),
+    ).toBe("/work/proj");
+  });
+
+  it("returns the path of a declared-store root", async () => {
+    expect(await detectProjectRoot(stubRun({ exitCode: 0, stdout: listJson("declared") }))).toBe(
+      "/p",
     );
   });
 
-  it("treats a declared-store root as a project", async () => {
-    expect(await isOpenSpecProject(stubRun({ exitCode: 0, stdout: listJson("declared") }))).toBe(
-      true,
-    );
-  });
-
-  it("treats an implicit root as not a project", async () => {
+  it("returns null for an implicit root", async () => {
     // Since 1.6.0 the command exits zero outside a project, anchoring an implicit root at cwd.
-    expect(await isOpenSpecProject(stubRun({ exitCode: 0, stdout: listJson("implicit") }))).toBe(
-      false,
-    );
+    expect(
+      await detectProjectRoot(stubRun({ exitCode: 0, stdout: listJson("implicit") })),
+    ).toBeNull();
   });
 
-  it("treats a non-zero exit as not a project", async () => {
-    expect(await isOpenSpecProject(stubRun({ exitCode: 1, stderr: "not a project" }))).toBe(false);
+  it("returns null for a non-zero exit", async () => {
+    expect(await detectProjectRoot(stubRun({ exitCode: 1, stderr: "not a project" }))).toBeNull();
   });
 
-  it("treats unparseable output as not a project", async () => {
-    expect(await isOpenSpecProject(stubRun({ exitCode: 0, stdout: "not json" }))).toBe(false);
+  it("returns null for unparseable output", async () => {
+    expect(await detectProjectRoot(stubRun({ exitCode: 0, stdout: "not json" }))).toBeNull();
   });
 
-  it("treats output without a root as not a project", async () => {
-    expect(await isOpenSpecProject(stubRun({ exitCode: 0, stdout: "{}" }))).toBe(false);
+  it("returns null for output without a root", async () => {
+    expect(await detectProjectRoot(stubRun({ exitCode: 0, stdout: "{}" }))).toBeNull();
   });
 });

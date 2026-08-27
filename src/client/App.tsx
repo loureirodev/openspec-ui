@@ -4,7 +4,9 @@ import { BrandIcon } from "./components/BrandIcon.js";
 import { BrandWordmark } from "./components/BrandWordmark.js";
 import { Diagnostics } from "./components/Diagnostics.js";
 import { Navigation } from "./components/Navigation.js";
+import { ProjectName } from "./components/ProjectName.js";
 import { RefreshControl } from "./components/RefreshControl.js";
+import { ThemeToggle } from "./components/ThemeToggle.js";
 import { ArchivedPage } from "./pages/ArchivedPage.js";
 import { ChangesPage } from "./pages/ChangesPage.js";
 import { NotFoundPage } from "./pages/NotFoundPage.js";
@@ -42,6 +44,8 @@ function Gate() {
 }
 
 export function App() {
+  const { data: health } = useHealth();
+
   return (
     <div className="app">
       <header className="app__header">
@@ -50,7 +54,11 @@ export function App() {
           <BrandWordmark className="app__brand-wordmark" />
         </span>
         <Navigation />
-        <RefreshControl />
+        <div className="app__header-tools">
+          <ProjectName health={health} />
+          <ThemeToggle />
+          <RefreshControl />
+        </div>
       </header>
       <main className="app__main">
         <Gate />
