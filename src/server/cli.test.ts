@@ -120,7 +120,7 @@ describe("runCli", () => {
     expect(result.listener).toBeUndefined();
 
     const [first, second] = io.out;
-    expect(first).toMatch(/^openspec-dashboard \S+\n$/);
+    expect(first).toMatch(/^openspec-ui \S+\n$/);
     expect(second).toMatch(/^openspec/);
   });
 

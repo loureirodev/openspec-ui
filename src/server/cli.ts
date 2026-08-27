@@ -12,7 +12,7 @@ export { DEFAULT_PORT };
 export const MAX_PORT_ATTEMPTS = 10;
 const MAX_PORT = 65535;
 
-export const USAGE = `Usage: openspec-dashboard [options]
+export const USAGE = `Usage: openspec-ui [options]
 
 Browse the OpenSpec project in the current directory.
 
@@ -166,7 +166,7 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<Cli
   }
 
   if (parsed.kind === "version") {
-    io.stdout(`openspec-dashboard ${await readDashboardVersion()}\n`);
+    io.stdout(`openspec-ui ${await readDashboardVersion()}\n`);
     io.stdout(`${await describeOpenSpecVersion()}\n`);
     return { exitCode: 0 };
   }
@@ -186,7 +186,7 @@ export async function runCli(argv: string[], io: CliIo = defaultIo): Promise<Cli
     return { exitCode: 1 };
   }
 
-  io.stdout(`OpenSpec dashboard listening on ${listener.url}\n`);
+  io.stdout(`OpenSpec UI listening on ${listener.url}\n`);
 
   if (open) {
     try {

@@ -16,7 +16,7 @@ npx @loureirodev/openspec-ui
 
 **Workflow:**
 
-1. **Run** `openspec-dashboard` inside any OpenSpec project
+1. **Run** `openspec-ui` inside any OpenSpec project
 2. **Browse** active changes, their artifacts and task progress
 3. **Cross-check** the specs the change touches, and the archive of what shipped
 4. **Refresh** — the data is re-read from disk on demand, so it follows your agent's edits
@@ -104,13 +104,13 @@ If the binary is missing or too old, the dashboard still starts and tells you ex
 
 ```bash
 # Browse the OpenSpec project in the current directory
-openspec-dashboard
+openspec-ui
 
 # Bind a specific port (falls back to the next free one if it's taken)
-openspec-dashboard --port 8080
+openspec-ui --port 8080
 
 # Don't open a browser
-openspec-dashboard --no-open
+openspec-ui --no-open
 ```
 
 ### CLI Options
@@ -126,8 +126,8 @@ Options:
 `--version` prints both the dashboard's version and the `openspec` binary it resolved, which is the fastest way to check an environment:
 
 ```
-$ openspec-dashboard --version
-openspec-dashboard 0.2.0
+$ openspec-ui --version
+openspec-ui 0.3.0
 openspec 1.6.0 (/usr/local/bin/openspec)
 ```
 

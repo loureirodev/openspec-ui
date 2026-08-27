@@ -1,4 +1,4 @@
-# OpenSpec Dashboard — Design System
+# OpenSpec UI — Design System
 
 This is the living design-system reference for the dashboard's frontend (`src/client`). It
 documents what the UI actually looks like today — tokens, typography, the status-icon

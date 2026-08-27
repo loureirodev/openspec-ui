@@ -12,7 +12,7 @@ const ASSET_JS = "console.log('spa');";
 let clientDir: string;
 
 beforeAll(async () => {
-  clientDir = await mkdtemp(join(tmpdir(), "openspec-dashboard-"));
+  clientDir = await mkdtemp(join(tmpdir(), "openspec-ui-"));
   await mkdir(join(clientDir, "assets"), { recursive: true });
   await writeFile(join(clientDir, "index.html"), INDEX_HTML);
   await writeFile(join(clientDir, "assets", "index-abc123.js"), ASSET_JS);
@@ -155,7 +155,7 @@ describe("the changes and archived API routes", () => {
   }
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), "openspec-dashboard-app-"));
+    root = await mkdtemp(join(tmpdir(), "openspec-ui-app-"));
     const openspecRoot = join(root, "openspec");
 
     // An active change the binary can resolve via `status --change`.
@@ -481,7 +481,7 @@ describe("the specs API routes", () => {
   }
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), "openspec-dashboard-specs-"));
+    root = await mkdtemp(join(tmpdir(), "openspec-ui-specs-"));
     const specDir = join(root, "openspec", "specs", "core");
     await mkdir(specDir, { recursive: true });
     await writeFile(join(specDir, "spec.md"), "## Requirement: Core\n\nBody.", "utf8");
